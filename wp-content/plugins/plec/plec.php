@@ -26,6 +26,11 @@ final class Plec_Plugin {
     }
 
     public function render_shortcode(): string {
+
+        if (!is_user_logged_in() || !current_user_can('subscriber')) {
+            return '';
+        }
+
         $this->enqueue_assets();
 
         return '<div id="plec-root"></div>';

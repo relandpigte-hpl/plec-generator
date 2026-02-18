@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SIP Template [HPL]</title>
+  </head>
+  <style>
+    html,
+    body {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #video-container {
+      width: 100%;
+      height: 100vh;
+    }
+
+    #video-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+  <body>
+    <div id="video-container">
+      <video id="sip-video" preload="none" autoplay muted loop playsinline>
+        <source id="sip-video-source" src="" type="video/mp4" />
+      </video>
+    </div>
+    <script>
+      /*
+       * SIP Video Template
+       *
+       * Behavior:
+       * - Switches source by viewport orientation:
+       *   portrait -> base64(portrait.mp4), landscape -> base64(landscape.mp4)
+       * - Applies container size workaround for extreme aspect ratios.
+       * - Uses requestAnimationFrame to coalesce resize/orientation events.
+       * - Attaches heavy listeners only while page is visible.
+       */
+
+      // --------------------------------------------------------------------------------------
+      // Start Editing here
+      // --------------------------------------------------------------------------------------
+      // TODO: Add base64 video for portrait
+      const srcPortrait = "{srcPortrait}";
+      // TODO: Add base64 video for landscape
+      const srcLandscape = "{srcLandscape}";
+      // --------------------------------------------------------------------------------------
+      // Stop Editing here
+      // --------------------------------------------------------------------------------------
+
+      // 16:9 is the target content frame used to compute fit workaround.
+      const targetAspectRatio = 16 / 9;
+      // Threshold for triggering extreme aspect-ratio compensation.
+      const extremeRatioThreshold = 1.8;
+
+      const video = document.getElementById("sip-video");
+      const source = document.getElementById("sip-video-source");
+      const container = document.getElementById("video-container");
+
+      // Handles clickthrough for MRAID environments, with browser fallback.
+      function handleClickAction() {
+        const mraid = window.mraid || {};
+        const clickTarget =
+          window.clickTag ||
+          window.clickTag1 ||
+          window.clickthrough ||
+          window.clickThrough ||
+          "";
+        if (mraid.open && typeof mraid.open === "function") {
+          if (clickTarget) {
+            mraid.open(clickTarget);
+          } else {
+            mraid.open();
+          }
+        } else {
+          window.open(clickTarget || "about:blank", "_blank", "noopener");
+        }
+      }
+
+      let lastTapAt = 0;
+
+      // Some iOS Safari environments do not consistently fire pointer events.
+      function handleTap(event) {
+        const now = Date.now();
+        if (now - lastTapAt < 500) {
+          return;
+        }
+
+        if (
+          event &&
+          (event.type === "touchend" ||
+            event.type === "pointerup" ||
+            event.type === "click")
+        ) {
+          lastTapAt = now;
+        }
+
+        handleClickAction();
+      }
+
+      // Writes size only when changed to avoid unnecessary style churn.
+      function setContainerSize(widthPct, heightPct) {
+        const width = `${widthPct}%`;
+        const height = `${heightPct}%`;
+        if (container.style.width !== width) {
+          container.style.width = width;
+        }
+        if (container.style.height !== height) {
+          container.style.height = height;
+        }
+      }
+
+      // Returns the container to full-screen footprint.
+      function resetContainer() {
+        setContainerSize(100, 100);
+      }
+
+      // Applies source + sizing based on current viewport orientation and ratio.
+      function setVideoForOrientation() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const isPortrait = height > width;
+        const src = isPortrait ? srcPortrait : srcLandscape;
+        const normalizedRatio =
+          width > height ? width / height : height / width;
+
+        resetContainer();
+        if (isPortrait) {
+          if (normalizedRatio > extremeRatioThreshold) {
+            const targetHeight = width * targetAspectRatio;
+            setContainerSize(100, (targetHeight / height) * 100);
+          }
+        } else {
+          if (normalizedRatio > extremeRatioThreshold) {
+            const targetWidth = height * targetAspectRatio;
+            setContainerSize((targetWidth / width) * 100, 100);
+          }
+        }
+
+        if (source.getAttribute("src") !== src) {
+          source.setAttribute("src", src);
+          video.load();
+        }
+      }
+
+      let listenersController = null;
+      let pendingFrame = 0;
+
+      // Schedules a single layout update per animation frame.
+      function scheduleOrientationUpdate() {
+        if (pendingFrame) {
+          return;
+        }
+
+        pendingFrame = window.requestAnimationFrame(() => {
+          pendingFrame = 0;
+          setVideoForOrientation();
+        });
+      }
+
+      // Subscribes runtime listeners only when page is active.
+      function attachActiveListeners() {
+        if (listenersController) {
+          return;
+        }
+
+        listenersController = new AbortController();
+        const { signal } = listenersController;
+
+        window.addEventListener("resize", scheduleOrientationUpdate, {
+          signal,
+          passive: true,
+        });
+        window.addEventListener(
+          "orientationchange",
+          scheduleOrientationUpdate,
+          {
+            signal,
+            passive: true,
+          },
+        );
+        container.addEventListener("pointerup", handleTap, { signal });
+        container.addEventListener("touchend", handleTap, {
+          signal,
+          passive: true,
+        });
+        container.addEventListener("click", handleTap, { signal });
+      }
+
+      // Unsubscribes listeners and cancels pending work to reduce overhead.
+      function detachActiveListeners() {
+        if (!listenersController) {
+          return;
+        }
+
+        listenersController.abort();
+        listenersController = null;
+
+        if (pendingFrame) {
+          window.cancelAnimationFrame(pendingFrame);
+          pendingFrame = 0;
+        }
+      }
+
+      // Activity lifecycle: visible -> attach/resume, hidden -> detach/pause.
+      function syncWindowActivityState() {
+        const isActive = document.visibilityState === "visible";
+
+        if (isActive) {
+          attachActiveListeners();
+          scheduleOrientationUpdate();
+          video.play().catch(() => {});
+        } else {
+          detachActiveListeners();
+          video.pause();
+        }
+      }
+
+      // Visibility/focus hooks used to toggle active runtime behavior.
+      document.addEventListener("visibilitychange", syncWindowActivityState);
+      window.addEventListener("focus", syncWindowActivityState);
+      window.addEventListener("blur", syncWindowActivityState);
+      window.addEventListener("pagehide", syncWindowActivityState);
+
+      syncWindowActivityState();
+    </script>
+  </body>
+</html>

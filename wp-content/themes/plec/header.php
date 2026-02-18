@@ -21,7 +21,7 @@
     <?php do_action('tailpress_header'); ?>
 
     <header class="container mx-auto py-6">
-        <div class="max-w-5xl mx-auto md:flex md:justify-between md:items-center">
+        <div class="mx-auto md:flex md:justify-between md:items-center">
             <div class="flex justify-between items-center">
                 <div>
                     <?php if (has_custom_logo()): ?>

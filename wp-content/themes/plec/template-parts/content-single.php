@@ -15,7 +15,7 @@
         </div>
     <?php endif; ?>
 
-    <div class="entry-content mx-auto max-w-5xl mt-4 sm:mt-8">
+    <div class="entry-content mx-auto mt-4 sm:mt-8">
         <?php the_content(); ?>
     </div>
 </article>

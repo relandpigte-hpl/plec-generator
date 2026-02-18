@@ -2,8 +2,8 @@ import React from "react";
 
 export default function Instructions() {
   return (
-    <div className="my-2">
-      <h3>Instructions:</h3>
+    <div className="mb-2">
+      <h3 className="p-0 m-0">Instructions:</h3>
       <p className="text-sm text-slate-700 mt-2">
         Only file types supported: GIF & MP4 using AppLovin’s specific specs.
       </p>

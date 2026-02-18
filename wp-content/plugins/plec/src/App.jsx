@@ -4,16 +4,40 @@ import Instructions from "./components/Instructions";
 
 const createRow = (id) => ({
   id,
-  adNetworks: ["Facebook"],
-  filename: `meta_campaign_${String.fromCharCode(96 + id)}.zip`,
-  iterationName: `Iteration ${String(id).padStart(2, "0")}`,
+  adNetworks: ["AppLovin"],
+  filename: "",
+  iterationName: "",
   files: {
     portrait: null,
     landscape: null,
   },
+  appStoreUrl: {
+    iOS: null,
+    Android: null,
+  }
 });
 
+const parseNamingFromAssetFilename = (fileName) => {
+  const nameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
+  const coreNameMatch = nameWithoutExtension.match(
+    /^(.*?_sip_\d{8}_\d{2})_.+_(portrait|landscape)$/i
+  );
+
+  if (!coreNameMatch) {
+    return null;
+  }
+
+  const filenameValue = coreNameMatch[1];
+  const iterationMatch = filenameValue.match(/(sip_\d{8}_\d{2})/i);
+
+  return {
+    filename: filenameValue,
+    iterationName: iterationMatch ? iterationMatch[1].toLowerCase() : null,
+  };
+};
+
 export default function App() {
+  const defaultAdNetwork = "AppLovin";
   const adNetworkOptions = [
     "AppLovin",
     "Facebook",
@@ -32,33 +56,53 @@ export default function App() {
     setRows((current) =>
       current.map((row) =>
         row.id === rowId
-          ? {
-              ...row,
-              files: {
-                ...row.files,
-                [type]: file,
-              },
-            }
+          ? (() => {
+              const nextRow = {
+                ...row,
+                files: {
+                  ...row.files,
+                  [type]: file,
+                },
+              };
+
+              if (!file?.name) {
+                return nextRow;
+              }
+
+              const parsedNaming = parseNamingFromAssetFilename(file.name);
+              if (!parsedNaming) {
+                return nextRow;
+              }
+
+              return {
+                ...nextRow,
+                filename: nextRow.filename.trim()
+                  ? nextRow.filename
+                  : parsedNaming.filename,
+                iterationName: nextRow.iterationName.trim()
+                  ? nextRow.iterationName
+                  : parsedNaming.iterationName || nextRow.iterationName,
+              };
+            })()
           : row
       )
     );
   };
 
   const toggleAdNetwork = (rowId, network) => {
+    if (network !== defaultAdNetwork) {
+      return;
+    }
+
     setRows((current) =>
       current.map((row) => {
         if (row.id !== rowId) {
           return row;
         }
 
-        const selected = row.adNetworks || [];
-      const nextSelected = selected.includes(network)
-        ? selected.filter((item) => item !== network)
-        : [...selected, network];
-
         return {
           ...row,
-          adNetworks: nextSelected,
+          adNetworks: [defaultAdNetwork],
         };
       })
     );
@@ -87,9 +131,9 @@ export default function App() {
   };
 
   return (
-    <div className="mx-auto my-6 max-w-275 font-sans flex flex-col gap-5">
+    <div className="mx-auto my-6 font-sans flex flex-col gap-5">
       <Instructions />
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded border border-slate-200 bg-white">
         <table className="w-full min-w-245 border-collapse">
           <thead>
             <tr>
@@ -98,7 +142,7 @@ export default function App() {
               <th className="plec-th">Landscape File</th>
               <th className="plec-th">Filename</th>
               <th className="plec-th">Iteration Name</th>
-              <th className="plec-th">Remove SIP</th>
+              <th className="plec-th">&nbsp;</th>
             </tr>
           </thead>
           <tbody>
@@ -108,13 +152,14 @@ export default function App() {
               return (
                 <tr key={rowKey} className="hover:bg-slate-50">
                   <td className="plec-td">
-                    <div className="grid grid-cols-1 gap-x-3 gap-y-1.5">
+                    <div className="grid grid-cols-none gap-x-3 gap-y-1.5">
                       {adNetworkOptions.map((option) => (
                         <label key={`${rowKey}-${option}`} className="flex items-center gap-1 text-xs text-slate-800">
                           <input
                             type="checkbox"
                             className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             checked={row.adNetworks.includes(option)}
+                            disabled={option !== defaultAdNetwork}
                             onChange={() => toggleAdNetwork(row.id, option)}
                           />
                           <span>{option}</span>
@@ -138,7 +183,7 @@ export default function App() {
                       onChange={(file) => setRowFile(row.id, "landscape", file)}
                     />
                   </td>
-                  <td className="plec-td">
+                  <td className="plec-td w-1/4">
                     <input
                       type="text"
                       className="plec-input"
@@ -146,17 +191,17 @@ export default function App() {
                       onChange={(event) => setRowText(row.id, "filename", event.target.value)}
                     />
                   </td>
-                  <td className="plec-td">
+                  <td className="plec-td w-1/4">
                     <input
                       type="text"
-                      className="plec-input"
+                      className="plec-input max-w-200"
                       value={row.iterationName}
                       onChange={(event) => setRowText(row.id, "iterationName", event.target.value)}
                     />
                   </td>
                   <td className="plec-td">
                     <button className="button" type="button" onClick={() => removeRow(row.id)} disabled={rows.length === 1}>
-                      X
+                      x
                     </button>
                   </td>
                 </tr>
