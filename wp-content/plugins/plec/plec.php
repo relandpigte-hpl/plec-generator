@@ -110,9 +110,15 @@ final class Plec_Plugin {
     }
 
     private function localize_app_config(): void {
+        $max_file_uploads = (int) ini_get('max_file_uploads');
+        if ($max_file_uploads <= 0) {
+            $max_file_uploads = 20;
+        }
+
         wp_localize_script(self::HANDLE, 'plecAppConfig', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('plec_generate_zip'),
+            'maxFileUploads' => $max_file_uploads,
         ]);
     }
 
@@ -155,7 +161,10 @@ final class Plec_Plugin {
             wp_send_json_error(['message' => 'Unauthorized'], 403);
         }
 
-        check_ajax_referer('plec_generate_zip', 'nonce');
+        $nonce = isset($_POST['nonce']) ? sanitize_text_field((string) wp_unslash($_POST['nonce'])) : '';
+        if (!wp_verify_nonce($nonce, 'plec_generate_zip')) {
+            wp_send_json_error(['message' => 'Invalid request nonce. Refresh the page and try again.'], 403);
+        }
 
         $rows = json_decode((string) wp_unslash($_POST['rows'] ?? ''), true);
         if (!is_array($rows) || empty($rows)) {

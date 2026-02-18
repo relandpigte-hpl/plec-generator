@@ -29,7 +29,7 @@ export default function FileDropZone({ value, onChange, inputId, label }) {
   return (
     <label
       htmlFor={inputId}
-      className={`flex w-55 cursor-pointer flex-col items-start gap-1 rounded border border-dashed p-2.5 ${
+      className={`flex w-60 cursor-pointer flex-col items-start gap-1 rounded border border-dashed p-2.5 ${
         isDragging
           ? "border-blue-600 bg-blue-50"
           : "border-slate-400 bg-slate-50 hover:border-slate-500"

@@ -36,6 +36,21 @@ const parseNamingFromAssetFilename = (fileName) => {
   };
 };
 
+const parseRowNumberFromAssetFilename = (fileName) => {
+  const match = fileName.match(/_(\d{2})_/);
+  if (!match) {
+    return null;
+  }
+
+  const rowNumber = Number.parseInt(match[1], 10);
+  return Number.isFinite(rowNumber) && rowNumber > 0 ? rowNumber : null;
+};
+
+const parseAssetTypeFromAssetFilename = (fileName) => {
+  const match = fileName.match(/(?:^|_)(portrait|landscape)(?:\.[^/.]+)?$/i);
+  return match ? match[1].toLowerCase() : null;
+};
+
 const areFilesSame = (fileA, fileB) => {
   if (!fileA || !fileB) {
     return false;
@@ -48,6 +63,8 @@ const areFilesSame = (fileA, fileB) => {
     fileA.type === fileB.type
   );
 };
+
+const hasAnyRowFile = (row) => !!row?.files?.portrait || !!row?.files?.landscape;
 
 export default function App() {
   const defaultAdNetwork = "AppLovin";
@@ -66,10 +83,30 @@ export default function App() {
   const [nextRowId, setNextRowId] = useState(2);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [isBulkDragging, setIsBulkDragging] = useState(false);
+
+  const withAutoAppendedRow = (updatedRows) => {
+    const lastRow = updatedRows[updatedRows.length - 1];
+    const isLastRowComplete =
+      !!lastRow?.files?.portrait && !!lastRow?.files?.landscape;
+
+    if (!isLastRowComplete) {
+      return updatedRows;
+    }
+
+    const maxRowId = updatedRows.reduce(
+      (maxId, row) => (row.id > maxId ? row.id : maxId),
+      0
+    );
+    const newRowId = maxRowId + 1;
+    setNextRowId((current) => (current <= newRowId ? newRowId + 1 : current));
+
+    return [...updatedRows, createRow(newRowId)];
+  };
 
   const setRowFile = (rowId, type, file) => {
-    setRows((current) =>
-      current.map((row) =>
+    setRows((current) => {
+      const updatedRows = current.map((row) =>
         row.id === rowId
           ? (() => {
               const nextRow = {
@@ -100,8 +137,10 @@ export default function App() {
               };
             })()
           : row
-      )
-    );
+      );
+
+      return withAutoAppendedRow(updatedRows);
+    });
   };
 
   const toggleAdNetwork = (rowId, network) => {
@@ -145,6 +184,128 @@ export default function App() {
     });
   };
 
+  const applyBulkUpload = (selectedFiles) => {
+    if (!selectedFiles || selectedFiles.length === 0) {
+      return;
+    }
+
+    const matchedUploads = [];
+    let skippedCount = 0;
+
+    selectedFiles.forEach((file) => {
+      const rowNumber = parseRowNumberFromAssetFilename(file.name);
+      const assetType = parseAssetTypeFromAssetFilename(file.name);
+
+      if (!rowNumber || !assetType) {
+        skippedCount += 1;
+        return;
+      }
+
+      matchedUploads.push({ file, rowNumber, assetType });
+    });
+
+    if (matchedUploads.length === 0) {
+      setStatusMessage(
+        "No files were matched. Use names that include _NN_ and end with _portrait or _landscape."
+      );
+      return;
+    }
+
+    const maxRowNumber = matchedUploads.reduce(
+      (maxValue, upload) =>
+        upload.rowNumber > maxValue ? upload.rowNumber : maxValue,
+      1
+    );
+
+    const assignedSlots = new Set();
+    matchedUploads.forEach(({ rowNumber, assetType }) => {
+      assignedSlots.add(`${rowNumber}-${assetType}`);
+    });
+
+    setRows((current) => {
+      const updatedRows = current.map((row) => ({
+        ...row,
+        files: { ...row.files },
+      }));
+
+      const currentMaxRowId = updatedRows.reduce(
+        (maxId, row) => (row.id > maxId ? row.id : maxId),
+        0
+      );
+      let nextId = currentMaxRowId + 1;
+
+      while (updatedRows.length < maxRowNumber) {
+        updatedRows.push(createRow(nextId));
+        nextId += 1;
+      }
+
+      setNextRowId((currentValue) =>
+        currentValue < nextId ? nextId : currentValue
+      );
+
+      matchedUploads.forEach(({ file, rowNumber, assetType }) => {
+        const targetRow = updatedRows[rowNumber - 1];
+        if (!targetRow) {
+          return;
+        }
+
+        targetRow.files[assetType] = file;
+
+        const parsedNaming = parseNamingFromAssetFilename(file.name);
+        if (!parsedNaming) {
+          return;
+        }
+
+        if (!targetRow.filename.trim()) {
+          targetRow.filename = parsedNaming.filename;
+        }
+
+        if (!targetRow.iterationName.trim() && parsedNaming.iterationName) {
+          targetRow.iterationName = parsedNaming.iterationName;
+        }
+      });
+
+      const compactedRows = updatedRows.filter(hasAnyRowFile);
+
+      return compactedRows.length > 0 ? compactedRows : [createRow(1)];
+    });
+
+    const messageSuffix =
+      skippedCount > 0
+        ? ` ${skippedCount} file(s) were skipped because the name did not match the pattern.`
+        : "";
+
+    setStatusMessage(
+      `Assigned ${matchedUploads.length} file(s) to ${assignedSlots.size} slot(s).${messageSuffix}`
+    );
+  };
+
+  const handleBulkUploadInputChange = (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    event.target.value = "";
+    applyBulkUpload(selectedFiles);
+  };
+
+  const handleBulkDragOver = (event) => {
+    event.preventDefault();
+    setIsBulkDragging(true);
+  };
+
+  const handleBulkDragLeave = (event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) {
+      return;
+    }
+
+    setIsBulkDragging(false);
+  };
+
+  const handleBulkDrop = (event) => {
+    event.preventDefault();
+    setIsBulkDragging(false);
+    const droppedFiles = Array.from(event.dataTransfer?.files || []);
+    applyBulkUpload(droppedFiles);
+  };
+
   const handleGenerate = async () => {
     if (isGenerating) {
       return;
@@ -156,7 +317,30 @@ export default function App() {
       return;
     }
 
-    const invalidRow = rows.find(
+    const rowsForGeneration = rows.filter(
+      (row) => !!row.files.portrait || !!row.files.landscape
+    );
+
+    if (rowsForGeneration.length === 0) {
+      setStatusMessage("Add at least one row with both files before generating.");
+      return;
+    }
+
+    const maxFileUploads = Number.parseInt(config.maxFileUploads, 10);
+    const uploadLimit = Number.isFinite(maxFileUploads) && maxFileUploads > 0
+      ? maxFileUploads
+      : 20;
+    const requiredUploads = rowsForGeneration.length * 2;
+
+    if (requiredUploads > uploadLimit) {
+      const maxRows = Math.floor(uploadLimit / 2);
+      setStatusMessage(
+        `Too many files for one request. You selected ${rowsForGeneration.length} rows (${requiredUploads} files), but the server limit is ${uploadLimit} files (about ${maxRows} row(s)). Generate in smaller batches or increase PHP max_file_uploads.`
+      );
+      return;
+    }
+
+    const invalidRow = rowsForGeneration.find(
       (row) => !row.files.portrait || !row.files.landscape
     );
 
@@ -165,7 +349,7 @@ export default function App() {
       return;
     }
 
-    const hasDuplicateMediaRow = rows.some((row) =>
+    const hasDuplicateMediaRow = rowsForGeneration.some((row) =>
       areFilesSame(row.files.portrait, row.files.landscape)
     );
 
@@ -176,7 +360,7 @@ export default function App() {
       return;
     }
 
-    const payloadRows = rows.map((row, index) => {
+    const payloadRows = rowsForGeneration.map((row, index) => {
       const baseName = row.filename.trim() || `sip-${index + 1}`;
       const fileName = /\.html?$/i.test(baseName) ? baseName : `${baseName}.html`;
 
@@ -194,7 +378,7 @@ export default function App() {
     formData.append("nonce", config.nonce);
     formData.append("rows", JSON.stringify(payloadRows));
 
-    rows.forEach((row) => {
+    rowsForGeneration.forEach((row) => {
       formData.append(`row_${row.id}_portrait`, row.files.portrait);
       formData.append(`row_${row.id}_landscape`, row.files.landscape);
     });
@@ -209,7 +393,24 @@ export default function App() {
         credentials: "same-origin",
       });
 
-      const data = await response.json();
+      const rawResponseText = await response.text();
+      let data = null;
+
+      try {
+        data = JSON.parse(rawResponseText);
+      } catch {
+        const readableServerMessage = rawResponseText
+          .replace(/<[^>]*>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 220);
+        throw new Error(
+          readableServerMessage
+            ? `Server returned non-JSON response: ${readableServerMessage}`
+            : "Server returned non-JSON response."
+        );
+      }
+
       if (!response.ok || !data?.success) {
         const message =
           data?.data?.message || "Generation failed. Please try again.";
@@ -229,7 +430,7 @@ export default function App() {
       document.body.removeChild(downloadAnchor);
 
       setStatusMessage(
-        `Generated ${data?.data?.fileCount ?? rows.length} file(s). Download started.`
+        `Generated ${data?.data?.fileCount ?? rowsForGeneration.length} file(s). Download started.`
       );
       setRows([createRow(1)]);
       setNextRowId(2);
@@ -243,6 +444,32 @@ export default function App() {
   return (
     <div className="mx-auto my-6 font-sans flex flex-col gap-5">
       <Instructions />
+      <div
+        className={`rounded border border-dashed p-3 transition-colors ${
+          isBulkDragging
+            ? "border-blue-500 bg-blue-50"
+            : "border-slate-300 bg-slate-50"
+        }`}
+        onDragOver={handleBulkDragOver}
+        onDragLeave={handleBulkDragLeave}
+        onDrop={handleBulkDrop}
+      >
+        <label className="flex cursor-pointer flex-col gap-1 text-sm text-slate-800">
+          <span className="font-medium">Bulk Upload</span>
+          <span className="text-xs text-slate-600 text-wrap break-words">
+            Upload multiple files. For best results, use this example naming pattern: <code className="text-amber-600">projectName_sip_YYYYMMDD_NN_clientName|conceptName_portrait|landscape.ext</code>.
+          </span>
+          <span className="text-xs text-slate-600">
+            Drag and drop files here, or click to choose files.
+          </span>
+          <input
+            type="file"
+            multiple
+            onChange={handleBulkUploadInputChange}
+            className="hidden"
+          />
+        </label>
+      </div>
       <div className="overflow-x-auto rounded border border-slate-200 bg-white">
         <table className="w-full min-w-245 border-collapse">
           <thead>
@@ -329,7 +556,7 @@ export default function App() {
           </tbody>
         </table>
       </div>
-      <div className="footer flex gap-5">
+      <div className="footer flex gap-5 md:flex-row flex-col">
         <button className="button min-w-50" type="button" onClick={addRow}>
           Add another SIP
         </button>

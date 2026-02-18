@@ -18,7 +18,7 @@ export default function Instructions() {
         <p>
           <span className="font-bold">Check File Size:</span> File sizes cannot be larger than
         </p>
-        <ul className="list-disc list-inside mt-2 p-0 grid grid-cols-2 gap-1">
+        <ul className="list-disc list-inside mt-2 p-0 grid md:grid-cols-2 gap-1">
           <li>3.4 MB for AppLovin (Combined)</li>
           <li>1.4 MB for Facebook (Individual)</li>
           <li>1.0 MB for Google (Individual)</li>
