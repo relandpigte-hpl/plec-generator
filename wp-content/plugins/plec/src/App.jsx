@@ -36,6 +36,19 @@ const parseNamingFromAssetFilename = (fileName) => {
   };
 };
 
+const areFilesSame = (fileA, fileB) => {
+  if (!fileA || !fileB) {
+    return false;
+  }
+
+  return (
+    fileA.name === fileB.name &&
+    fileA.size === fileB.size &&
+    fileA.lastModified === fileB.lastModified &&
+    fileA.type === fileB.type
+  );
+};
+
 export default function App() {
   const defaultAdNetwork = "AppLovin";
   const adNetworkOptions = [
@@ -51,6 +64,8 @@ export default function App() {
 
   const [rows, setRows] = useState([createRow(1)]);
   const [nextRowId, setNextRowId] = useState(2);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
 
   const setRowFile = (rowId, type, file) => {
     setRows((current) =>
@@ -130,6 +145,101 @@ export default function App() {
     });
   };
 
+  const handleGenerate = async () => {
+    if (isGenerating) {
+      return;
+    }
+
+    const config = window.plecAppConfig || {};
+    if (!config.ajaxUrl || !config.nonce) {
+      setStatusMessage("Missing app config. Reload the page and try again.");
+      return;
+    }
+
+    const invalidRow = rows.find(
+      (row) => !row.files.portrait || !row.files.landscape
+    );
+
+    if (invalidRow) {
+      setStatusMessage("Each row needs both portrait and landscape files.");
+      return;
+    }
+
+    const hasDuplicateMediaRow = rows.some((row) =>
+      areFilesSame(row.files.portrait, row.files.landscape)
+    );
+
+    if (hasDuplicateMediaRow) {
+      setStatusMessage(
+        "Portrait and landscape files cannot be the same in the same row."
+      );
+      return;
+    }
+
+    const payloadRows = rows.map((row, index) => {
+      const baseName = row.filename.trim() || `sip-${index + 1}`;
+      const fileName = /\.html?$/i.test(baseName) ? baseName : `${baseName}.html`;
+
+      return {
+        id: row.id,
+        filename: fileName,
+        adNetwork: row.adNetworks?.[0] || defaultAdNetwork,
+        portraitField: `row_${row.id}_portrait`,
+        landscapeField: `row_${row.id}_landscape`,
+      };
+    });
+
+    const formData = new FormData();
+    formData.append("action", "plec_generate_zip");
+    formData.append("nonce", config.nonce);
+    formData.append("rows", JSON.stringify(payloadRows));
+
+    rows.forEach((row) => {
+      formData.append(`row_${row.id}_portrait`, row.files.portrait);
+      formData.append(`row_${row.id}_landscape`, row.files.landscape);
+    });
+
+    try {
+      setIsGenerating(true);
+      setStatusMessage("Generating files and zip archive...");
+
+      const response = await fetch(config.ajaxUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        const message =
+          data?.data?.message || "Generation failed. Please try again.";
+        throw new Error(message);
+      }
+
+      const downloadUrl = data?.data?.downloadUrl;
+      if (!downloadUrl) {
+        throw new Error("Zip was created but no download URL was returned.");
+      }
+
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.href = downloadUrl;
+      downloadAnchor.download = "";
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      setStatusMessage(
+        `Generated ${data?.data?.fileCount ?? rows.length} file(s). Download started.`
+      );
+      setRows([createRow(1)]);
+      setNextRowId(2);
+    } catch (error) {
+      setStatusMessage(error?.message || "Generation failed.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="mx-auto my-6 font-sans flex flex-col gap-5">
       <Instructions />
@@ -148,9 +258,18 @@ export default function App() {
           <tbody>
             {rows.map((row) => {
               const rowKey = `row-${row.id}`;
+              const hasDuplicateMedia = areFilesSame(
+                row.files.portrait,
+                row.files.landscape
+              );
 
               return (
-                <tr key={rowKey} className="hover:bg-slate-50">
+                <tr
+                  key={rowKey}
+                  className={`${
+                    hasDuplicateMedia ? "bg-red-50" : ""
+                  } hover:bg-slate-50`}
+                >
                   <td className="plec-td">
                     <div className="grid grid-cols-none gap-x-3 gap-y-1.5">
                       {adNetworkOptions.map((option) => (
@@ -194,7 +313,7 @@ export default function App() {
                   <td className="plec-td w-1/4">
                     <input
                       type="text"
-                      className="plec-input max-w-200"
+                      className="plec-input"
                       value={row.iterationName}
                       onChange={(event) => setRowText(row.id, "iterationName", event.target.value)}
                     />
@@ -214,13 +333,20 @@ export default function App() {
         <button className="button min-w-50" type="button" onClick={addRow}>
           Add another SIP
         </button>
-        <button className="button bg-blue-500! hover:bg-blue-700! text-white! min-w-50">Generate</button>
+        <button
+          className="button bg-blue-500! hover:bg-blue-700! text-white! min-w-50 disabled:cursor-not-allowed disabled:opacity-60"
+          type="button"
+          onClick={handleGenerate}
+          disabled={isGenerating}
+        >
+          {isGenerating ? "Generating..." : "Generate"}
+        </button>
       </div>
-      <div className="notice">
-        <p className="text-sm text-slate-600">
-          <span className="font-bold">Notice</span>: It may take up to a minute for preview content to be ready.
-        </p>
-      </div>
+      {statusMessage ? (
+        <div className="notice">
+          <p className="text-sm text-slate-700">{statusMessage}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
