@@ -66,6 +66,18 @@ const areFilesSame = (fileA, fileB) => {
 
 const hasAnyRowFile = (row) => !!row?.files?.portrait || !!row?.files?.landscape;
 const MAX_FILE_UPLOADS = 20;
+const ALLOWED_UPLOAD_EXTENSIONS = [".mp4", ".gif"];
+
+const isAllowedUploadFile = (file) => {
+  if (!file?.name) {
+    return false;
+  }
+
+  const lowerName = file.name.toLowerCase();
+  return ALLOWED_UPLOAD_EXTENSIONS.some((extension) =>
+    lowerName.endsWith(extension)
+  );
+};
 
 export default function App() {
   const defaultAdNetwork = "AppLovin";
@@ -106,6 +118,11 @@ export default function App() {
   };
 
   const setRowFile = (rowId, type, file) => {
+    if (file && !isAllowedUploadFile(file)) {
+      setStatusMessage("Only MP4 and GIF files are allowed.");
+      return;
+    }
+
     setRows((current) => {
       const updatedRows = current.map((row) =>
         row.id === rowId
@@ -192,8 +209,14 @@ export default function App() {
 
     const matchedUploads = [];
     let skippedCount = 0;
+    let invalidFormatCount = 0;
 
     selectedFiles.forEach((file) => {
+      if (!isAllowedUploadFile(file)) {
+        invalidFormatCount += 1;
+        return;
+      }
+
       const rowNumber = parseRowNumberFromAssetFilename(file.name);
       const assetType = parseAssetTypeFromAssetFilename(file.name);
 
@@ -206,9 +229,10 @@ export default function App() {
     });
 
     if (matchedUploads.length === 0) {
-      setStatusMessage(
-        "No files were matched. Use names that include _NN_ and end with _portrait or _landscape."
-      );
+      const reason = invalidFormatCount > 0
+        ? "Only MP4 and GIF files are allowed."
+        : "Use names that include _NN_ and end with _portrait or _landscape.";
+      setStatusMessage(`No files were matched. ${reason}`);
       return;
     }
 
@@ -275,9 +299,13 @@ export default function App() {
       skippedCount > 0
         ? ` ${skippedCount} file(s) were skipped because the name did not match the pattern.`
         : "";
+    const invalidFormatSuffix =
+      invalidFormatCount > 0
+        ? ` ${invalidFormatCount} file(s) were skipped because only MP4 and GIF are allowed.`
+        : "";
 
     setStatusMessage(
-      `Assigned ${matchedUploads.length} file(s) to ${assignedSlots.size} slot(s).${messageSuffix}`
+      `Assigned ${matchedUploads.length} file(s) to ${assignedSlots.size} slot(s).${messageSuffix}${invalidFormatSuffix}`
     );
   };
 
@@ -492,6 +520,7 @@ export default function App() {
             <input
               type="file"
               multiple
+              accept=".mp4,.gif,video/mp4,image/gif"
               onChange={handleBulkUploadInputChange}
               className="hidden"
             />

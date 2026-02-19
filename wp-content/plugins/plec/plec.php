@@ -16,6 +16,10 @@ final class Plec_Plugin {
     private const DEV_SERVER_DEFAULT = 'http://localhost:5173';
     private const DEV_SERVER_DEBUG = true;
     private const MAX_FILE_UPLOADS = 20;
+    private const ALLOWED_UPLOAD_MIME_TYPES = [
+        'mp4' => 'video/mp4',
+        'gif' => 'image/gif',
+    ];
     private const ZIP_RETENTION_SECONDS = HOUR_IN_SECONDS;
     private const MODULE_HANDLES = [
         'plec-app',
@@ -229,6 +233,8 @@ final class Plec_Plugin {
 
             $portrait_field = sanitize_key((string) ($row['portraitField'] ?? ''));
             $landscape_field = sanitize_key((string) ($row['landscapeField'] ?? ''));
+            $portrait_name = (string) ($_FILES[$portrait_field]['name'] ?? '');
+            $landscape_name = (string) ($_FILES[$landscape_field]['name'] ?? '');
             $requested_filename = (string) ($row['filename'] ?? '');
             $filename = $this->build_output_filename($requested_filename, (int) $index + 1, $used_filenames);
 
@@ -245,6 +251,12 @@ final class Plec_Plugin {
 
             if (!is_string($landscape_tmp) || $landscape_tmp === '' || !is_uploaded_file($landscape_tmp)) {
                 wp_send_json_error(['message' => "Missing landscape file for {$filename}."], 400);
+            }
+            if (!$this->is_allowed_upload($portrait_tmp, $portrait_name)) {
+                wp_send_json_error(['message' => "Portrait file for {$filename} must be MP4 or GIF."], 400);
+            }
+            if (!$this->is_allowed_upload($landscape_tmp, $landscape_name)) {
+                wp_send_json_error(['message' => "Landscape file for {$filename} must be MP4 or GIF."], 400);
             }
 
             $src_portrait = $this->build_data_uri_from_upload($portrait_tmp);
@@ -333,6 +345,26 @@ final class Plec_Plugin {
         }
 
         return 'data:' . $mime . ';base64,' . base64_encode($content);
+    }
+
+    private function is_allowed_upload(string $tmp_file, string $original_name): bool {
+        if ($tmp_file === '' || $original_name === '') {
+            return false;
+        }
+
+        $detected = wp_check_filetype_and_ext($tmp_file, $original_name, self::ALLOWED_UPLOAD_MIME_TYPES);
+        $detected_ext = (string) ($detected['ext'] ?? '');
+        $detected_type = (string) ($detected['type'] ?? '');
+
+        if ($detected_ext === '' || $detected_type === '') {
+            return false;
+        }
+
+        if (!array_key_exists($detected_ext, self::ALLOWED_UPLOAD_MIME_TYPES)) {
+            return false;
+        }
+
+        return self::ALLOWED_UPLOAD_MIME_TYPES[$detected_ext] === $detected_type;
     }
 
     private function cleanup_old_zip_archives(string $base_dir): void {

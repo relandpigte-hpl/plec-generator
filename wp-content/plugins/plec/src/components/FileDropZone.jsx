@@ -42,6 +42,7 @@ export default function FileDropZone({ value, onChange, inputId, label }) {
         id={inputId}
         className="hidden"
         type="file"
+        accept=".mp4,.gif,video/mp4,image/gif"
         onChange={onInputChange}
       />
       <span className="text-xs text-slate-700">{label}</span>
