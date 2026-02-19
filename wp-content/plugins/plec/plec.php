@@ -183,7 +183,7 @@ final class Plec_Plugin {
             ], 400);
         }
 
-        $template_path = plugin_dir_path(__FILE__) . 'src/templates/sip-template.html';
+        $template_path = plugin_dir_path(__FILE__) . 'templates/sip-template.html';
         if (!file_exists($template_path)) {
             wp_send_json_error(['message' => 'Template file not found.'], 500);
         }
