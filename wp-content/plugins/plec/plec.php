@@ -28,7 +28,7 @@ final class Plec_Plugin {
     }
 
     public function render_shortcode(): string {
-        if (!is_user_logged_in() || !current_user_can('manage_options')) {
+        if (!$this->can_current_user_use_generator()) {
             return '';
         }
 
@@ -157,7 +157,7 @@ final class Plec_Plugin {
     }
 
     public function handle_generate_zip(): void {
-        if (!current_user_can('manage_options')) {
+        if (!$this->can_current_user_use_generator()) {
             wp_send_json_error(['message' => 'Unauthorized'], 403);
         }
 
@@ -380,6 +380,20 @@ final class Plec_Plugin {
         }
 
         return "{$network_prefix}-sip";
+    }
+
+    private function can_current_user_use_generator(): bool {
+        if (!is_user_logged_in()) {
+            return false;
+        }
+
+        $user = wp_get_current_user();
+        if (!$user instanceof WP_User) {
+            return false;
+        }
+
+        return in_array('administrator', $user->roles, true)
+            || in_array('subscriber', $user->roles, true);
     }
 }
 
