@@ -1,5 +1,6 @@
 @utility container {
-    max-width: var(--wp--style--global--wide-size);
+    width: 100%;
+    max-width: none;
 }
 
 @utility alignfull {

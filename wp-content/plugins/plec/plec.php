@@ -15,6 +15,7 @@ final class Plec_Plugin {
     private const SHORTCODE = 'plec';
     private const DEV_SERVER_DEFAULT = 'http://localhost:5173';
     private const DEV_SERVER_DEBUG = true;
+    private const MAX_FILE_UPLOADS = 20;
     private const ZIP_RETENTION_SECONDS = HOUR_IN_SECONDS;
     private const MODULE_HANDLES = [
         'plec-app',
@@ -112,8 +113,9 @@ final class Plec_Plugin {
     private function localize_app_config(): void {
         $max_file_uploads = (int) ini_get('max_file_uploads');
         if ($max_file_uploads <= 0) {
-            $max_file_uploads = 20;
+            $max_file_uploads = self::MAX_FILE_UPLOADS;
         }
+        $max_file_uploads = min(self::MAX_FILE_UPLOADS, $max_file_uploads);
 
         wp_localize_script(self::HANDLE, 'plecAppConfig', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
@@ -169,6 +171,16 @@ final class Plec_Plugin {
         $rows = json_decode((string) wp_unslash($_POST['rows'] ?? ''), true);
         if (!is_array($rows) || empty($rows)) {
             wp_send_json_error(['message' => 'No rows were provided.'], 400);
+        }
+        $required_uploads = count($rows) * 2;
+        if ($required_uploads > self::MAX_FILE_UPLOADS) {
+            wp_send_json_error([
+                'message' => sprintf(
+                    'Too many files for one request. Maximum is %d files (%d rows).',
+                    self::MAX_FILE_UPLOADS,
+                    (int) floor(self::MAX_FILE_UPLOADS / 2)
+                ),
+            ], 400);
         }
 
         $template_path = plugin_dir_path(__FILE__) . 'src/templates/sip-template.html';

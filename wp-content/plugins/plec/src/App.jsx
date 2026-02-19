@@ -65,6 +65,7 @@ const areFilesSame = (fileA, fileB) => {
 };
 
 const hasAnyRowFile = (row) => !!row?.files?.portrait || !!row?.files?.landscape;
+const MAX_FILE_UPLOADS = 20;
 
 export default function App() {
   const defaultAdNetwork = "AppLovin";
@@ -327,15 +328,16 @@ export default function App() {
     }
 
     const maxFileUploads = Number.parseInt(config.maxFileUploads, 10);
-    const uploadLimit = Number.isFinite(maxFileUploads) && maxFileUploads > 0
+    const serverLimit = Number.isFinite(maxFileUploads) && maxFileUploads > 0
       ? maxFileUploads
-      : 20;
+      : MAX_FILE_UPLOADS;
+    const uploadLimit = Math.min(MAX_FILE_UPLOADS, serverLimit);
     const requiredUploads = rowsForGeneration.length * 2;
 
     if (requiredUploads > uploadLimit) {
       const maxRows = Math.floor(uploadLimit / 2);
       setStatusMessage(
-        `Too many files for one request. You selected ${rowsForGeneration.length} rows (${requiredUploads} files), but the server limit is ${uploadLimit} files (about ${maxRows} row(s)). Generate in smaller batches or increase PHP max_file_uploads.`
+        `Too many files for one request. You selected ${rowsForGeneration.length} rows (${requiredUploads} files), but the limit is ${uploadLimit} files (about ${maxRows} row(s)). Generate in smaller batches.`
       );
       return;
     }
@@ -442,138 +444,164 @@ export default function App() {
   };
 
   return (
-    <div className="mx-auto my-6 font-sans flex flex-col gap-5">
-      <Instructions />
-      <div
-        className={`rounded border border-dashed p-3 transition-colors ${
-          isBulkDragging
-            ? "border-blue-500 bg-blue-50"
-            : "border-slate-300 bg-slate-50"
-        }`}
-        onDragOver={handleBulkDragOver}
-        onDragLeave={handleBulkDragLeave}
-        onDrop={handleBulkDrop}
-      >
-        <label className="flex cursor-pointer flex-col gap-1 text-sm text-slate-800">
-          <span className="font-medium">Bulk Upload</span>
-          <span className="text-xs text-slate-600 text-wrap break-words">
-            Upload multiple files. For best results, use this example naming pattern: <code className="text-amber-600">projectName_sip_YYYYMMDD_NN_clientName|conceptName_portrait|landscape.ext</code>.
-          </span>
-          <span className="text-xs text-slate-600">
-            Drag and drop files here, or click to choose files.
-          </span>
-          <input
-            type="file"
-            multiple
-            onChange={handleBulkUploadInputChange}
-            className="hidden"
-          />
-        </label>
-      </div>
-      <div className="overflow-x-auto rounded border border-slate-200 bg-white">
-        <table className="w-full min-w-245 border-collapse">
-          <thead>
-            <tr>
-              <th className="plec-th">Ad Network</th>
-              <th className="plec-th">Portrait File</th>
-              <th className="plec-th">Landscape File</th>
-              <th className="plec-th">Filename</th>
-              <th className="plec-th">Iteration Name</th>
-              <th className="plec-th">&nbsp;</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const rowKey = `row-${row.id}`;
-              const hasDuplicateMedia = areFilesSame(
-                row.files.portrait,
-                row.files.landscape
-              );
-
-              return (
-                <tr
-                  key={rowKey}
-                  className={`${
-                    hasDuplicateMedia ? "bg-red-50" : ""
-                  } hover:bg-slate-50`}
-                >
-                  <td className="plec-td">
-                    <div className="grid grid-cols-none gap-x-3 gap-y-1.5">
-                      {adNetworkOptions.map((option) => (
-                        <label key={`${rowKey}-${option}`} className="flex items-center gap-1 text-xs text-slate-800">
-                          <input
-                            type="checkbox"
-                            className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                            checked={row.adNetworks.includes(option)}
-                            disabled={option !== defaultAdNetwork}
-                            onChange={() => toggleAdNetwork(row.id, option)}
-                          />
-                          <span>{option}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="plec-td">
-                    <FileDropZone
-                      inputId={`portrait-${rowKey}`}
-                      label="Drop portrait file"
-                      value={row.files.portrait || null}
-                      onChange={(file) => setRowFile(row.id, "portrait", file)}
-                    />
-                  </td>
-                  <td className="plec-td">
-                    <FileDropZone
-                      inputId={`landscape-${rowKey}`}
-                      label="Drop landscape file"
-                      value={row.files.landscape || null}
-                      onChange={(file) => setRowFile(row.id, "landscape", file)}
-                    />
-                  </td>
-                  <td className="plec-td w-1/4">
-                    <input
-                      type="text"
-                      className="plec-input"
-                      value={row.filename}
-                      onChange={(event) => setRowText(row.id, "filename", event.target.value)}
-                    />
-                  </td>
-                  <td className="plec-td w-1/4">
-                    <input
-                      type="text"
-                      className="plec-input"
-                      value={row.iterationName}
-                      onChange={(event) => setRowText(row.id, "iterationName", event.target.value)}
-                    />
-                  </td>
-                  <td className="plec-td">
-                    <button className="button" type="button" onClick={() => removeRow(row.id)} disabled={rows.length === 1}>
-                      x
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div className="footer flex gap-5 md:flex-row flex-col">
-        <button className="button min-w-50" type="button" onClick={addRow}>
-          Add another SIP
-        </button>
-        <button
-          className="button bg-blue-500! hover:bg-blue-700! text-white! min-w-50 disabled:cursor-not-allowed disabled:opacity-60"
-          type="button"
-          onClick={handleGenerate}
-          disabled={isGenerating}
-        >
-          {isGenerating ? "Generating..." : "Generate"}
-        </button>
-      </div>
-      {statusMessage ? (
-        <div className="notice">
-          <p className="text-sm text-slate-700">{statusMessage}</p>
+    <>
+      {isGenerating ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-md px-4">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/55 bg-gradient-to-br from-white via-slate-50 to-blue-100 p-7 text-center shadow-2xl">
+            <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-blue-300/35 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-10 -right-8 h-28 w-28 rounded-full bg-cyan-300/40 blur-2xl" />
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 animate-ping rounded-full bg-blue-200/70" />
+              <div className="absolute inset-1 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
+              <div className="absolute inset-4 rounded-full bg-white shadow-inner" />
+            </div>
+            <p className="text-lg font-semibold tracking-tight text-slate-900">
+              Please wait while processing and don&apos;t refresh the page
+            </p>
+            <div className="mt-3 flex items-center justify-center gap-1.5">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500" />
+            </div>
+          </div>
         </div>
       ) : null}
-    </div>
+      <div className="mx-auto my-6 font-sans flex flex-col gap-5">
+        <Instructions />
+        <div
+          className={`rounded border border-dashed p-3 transition-colors ${
+            isBulkDragging
+              ? "border-blue-500 bg-blue-50"
+              : "border-slate-300 bg-slate-50"
+          }`}
+          onDragOver={handleBulkDragOver}
+          onDragLeave={handleBulkDragLeave}
+          onDrop={handleBulkDrop}
+        >
+          <label className="flex cursor-pointer flex-col gap-1 text-sm text-slate-800">
+            <span className="font-medium">Bulk Upload</span>
+            <span className="text-xs text-slate-600 text-wrap wrap-break">
+              Upload multiple files. For best results, use this example naming pattern: <code className="text-amber-600">projectName_sip_YYYYMMDD_NN_clientName|conceptName_portrait|landscape.ext</code>.
+            </span>
+            <span className="text-xs text-slate-600">
+              Drag and drop files here, or click to choose files.
+            </span>
+            <span className="text-xs text-amber-600">
+              Note: Bulk upload is limited to {MAX_FILE_UPLOADS} files per batch due to server constraints. If you have many files, please upload in multiple batches.
+            </span>
+            <input
+              type="file"
+              multiple
+              onChange={handleBulkUploadInputChange}
+              className="hidden"
+            />
+          </label>
+        </div>
+        <div className="overflow-x-auto rounded border border-slate-200 bg-white">
+          <table className="w-full min-w-245 border-collapse">
+            <thead>
+              <tr>
+                <th className="plec-th">Ad Network</th>
+                <th className="plec-th">Portrait File</th>
+                <th className="plec-th">Landscape File</th>
+                <th className="plec-th">Filename</th>
+                <th className="plec-th">Iteration Name</th>
+                <th className="plec-th">&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const rowKey = `row-${row.id}`;
+                const hasDuplicateMedia = areFilesSame(
+                  row.files.portrait,
+                  row.files.landscape
+                );
+
+                return (
+                  <tr
+                    key={rowKey}
+                    className={`${
+                      hasDuplicateMedia ? "bg-red-50" : ""
+                    } hover:bg-slate-50`}
+                  >
+                    <td className="plec-td">
+                      <div className="grid grid-cols-none gap-x-3 gap-y-1.5">
+                        {adNetworkOptions.map((option) => (
+                          <label key={`${rowKey}-${option}`} className="flex items-center gap-1 text-xs text-slate-800">
+                            <input
+                              type="checkbox"
+                              className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              checked={row.adNetworks.includes(option)}
+                              disabled={option !== defaultAdNetwork}
+                              onChange={() => toggleAdNetwork(row.id, option)}
+                            />
+                            <span>{option}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="plec-td">
+                      <FileDropZone
+                        inputId={`portrait-${rowKey}`}
+                        label="Drop portrait file"
+                        value={row.files.portrait || null}
+                        onChange={(file) => setRowFile(row.id, "portrait", file)}
+                      />
+                    </td>
+                    <td className="plec-td">
+                      <FileDropZone
+                        inputId={`landscape-${rowKey}`}
+                        label="Drop landscape file"
+                        value={row.files.landscape || null}
+                        onChange={(file) => setRowFile(row.id, "landscape", file)}
+                      />
+                    </td>
+                    <td className="plec-td w-1/4">
+                      <input
+                        type="text"
+                        className="plec-input"
+                        value={row.filename}
+                        onChange={(event) => setRowText(row.id, "filename", event.target.value)}
+                      />
+                    </td>
+                    <td className="plec-td w-1/4">
+                      <input
+                        type="text"
+                        className="plec-input"
+                        value={row.iterationName}
+                        onChange={(event) => setRowText(row.id, "iterationName", event.target.value)}
+                      />
+                    </td>
+                    <td className="plec-td">
+                      <button className="button" type="button" onClick={() => removeRow(row.id)} disabled={rows.length === 1}>
+                        x
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="footer flex gap-5 md:flex-row flex-col">
+          <button className="button min-w-50" type="button" onClick={addRow}>
+            Add another SIP
+          </button>
+          <button
+            className="button bg-blue-500! hover:bg-blue-700! text-white! min-w-50 disabled:cursor-not-allowed disabled:opacity-60"
+            type="button"
+            onClick={handleGenerate}
+            disabled={isGenerating}
+          >
+            {isGenerating ? "Generating..." : "Generate"}
+          </button>
+        </div>
+        {statusMessage ? (
+          <div className="notice">
+            <p className="text-sm text-slate-700">{statusMessage}</p>
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }
