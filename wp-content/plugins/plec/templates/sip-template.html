@@ -192,12 +192,12 @@
             passive: true,
           },
         );
-        container.addEventListener("pointerup", handleTap, { signal });
-        container.addEventListener("touchend", handleTap, {
+        document.addEventListener("pointerup", handleTap, { signal });
+        document.addEventListener("touchend", handleTap, {
           signal,
           passive: true,
         });
-        container.addEventListener("click", handleTap, { signal });
+        document.addEventListener("click", handleTap, { signal });
       }
 
       // Unsubscribes listeners and cancels pending work to reduce overhead.
