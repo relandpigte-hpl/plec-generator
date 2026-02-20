@@ -224,7 +224,7 @@ final class Plec_Plugin {
         }
 
         $generated_files = [];
-        $used_filenames = [];
+        $used_filenames_by_network = [];
 
         foreach ($rows as $index => $row) {
             if (!is_array($row)) {
@@ -236,7 +236,7 @@ final class Plec_Plugin {
             $portrait_name = (string) ($_FILES[$portrait_field]['name'] ?? '');
             $landscape_name = (string) ($_FILES[$landscape_field]['name'] ?? '');
             $requested_filename = (string) ($row['filename'] ?? '');
-            $filename = $this->build_output_filename($requested_filename, (int) $index + 1, $used_filenames);
+            $ad_networks = $this->extract_ad_networks($row);
 
             if ($portrait_field === '' || $landscape_field === '') {
                 wp_send_json_error(['message' => 'Missing portrait/landscape field mapping.'], 400);
@@ -246,43 +246,58 @@ final class Plec_Plugin {
             $landscape_tmp = $_FILES[$landscape_field]['tmp_name'] ?? '';
 
             if (!is_string($portrait_tmp) || $portrait_tmp === '' || !is_uploaded_file($portrait_tmp)) {
-                wp_send_json_error(['message' => "Missing portrait file for {$filename}."], 400);
+                wp_send_json_error(['message' => 'Missing portrait file for one or more outputs.'], 400);
             }
 
             if (!is_string($landscape_tmp) || $landscape_tmp === '' || !is_uploaded_file($landscape_tmp)) {
-                wp_send_json_error(['message' => "Missing landscape file for {$filename}."], 400);
+                wp_send_json_error(['message' => 'Missing landscape file for one or more outputs.'], 400);
             }
             if (!$this->is_allowed_upload($portrait_tmp, $portrait_name)) {
-                wp_send_json_error(['message' => "Portrait file for {$filename} must be MP4 or GIF."], 400);
+                wp_send_json_error(['message' => 'Portrait file must be MP4 or GIF.'], 400);
             }
             if (!$this->is_allowed_upload($landscape_tmp, $landscape_name)) {
-                wp_send_json_error(['message' => "Landscape file for {$filename} must be MP4 or GIF."], 400);
+                wp_send_json_error(['message' => 'Landscape file must be MP4 or GIF.'], 400);
             }
 
             $src_portrait = $this->build_data_uri_from_upload($portrait_tmp);
             $src_landscape = $this->build_data_uri_from_upload($landscape_tmp);
 
             if ($src_portrait === '' || $src_landscape === '') {
-                wp_send_json_error(['message' => "Failed to process media for {$filename}."], 500);
+                wp_send_json_error(['message' => 'Failed to process media for one or more outputs.'], 500);
             }
 
-            $html = str_replace(
-                ['{srcPortrait}', '{srcLandscape}'],
-                [$src_portrait, $src_landscape],
-                $template
-            );
+            foreach ($ad_networks as $ad_network) {
+                $network_directory = $this->build_network_directory_name($ad_network);
+                $network_bucket = $network_directory === '' ? '__root__' : $network_directory;
+                if (!isset($used_filenames_by_network[$network_bucket])) {
+                    $used_filenames_by_network[$network_bucket] = [];
+                }
 
-            $file_path = trailingslashit($job_dir) . $filename;
-            $write_result = file_put_contents($file_path, $html);
+                $filename = $this->build_output_filename($requested_filename, (int) $index + 1, $used_filenames_by_network[$network_bucket]);
+                $clickthrough_adapter = $this->build_clickthrough_adapter($ad_network);
+                $html = str_replace(
+                    ['{srcPortrait}', '{srcLandscape}', '// __CLICKTHROUGH_ADAPTER__'],
+                    [$src_portrait, $src_landscape, $clickthrough_adapter],
+                    $template
+                );
 
-            if ($write_result === false) {
-                wp_send_json_error(['message' => "Could not write {$filename}."], 500);
+                $network_dir_path = $network_directory === '' ? $job_dir : trailingslashit($job_dir) . $network_directory;
+                if ($network_directory !== '' && !is_dir($network_dir_path) && !wp_mkdir_p($network_dir_path)) {
+                    wp_send_json_error(['message' => "Unable to create output directory for {$network_directory}."], 500);
+                }
+
+                $file_path = trailingslashit($network_dir_path) . $filename;
+                $write_result = file_put_contents($file_path, $html);
+
+                if ($write_result === false) {
+                    wp_send_json_error(['message' => "Could not write {$filename}."], 500);
+                }
+
+                $generated_files[] = [
+                    'path' => $file_path,
+                    'name' => $network_directory === '' ? $filename : trailingslashit($network_directory) . $filename,
+                ];
             }
-
-            $generated_files[] = [
-                'path' => $file_path,
-                'name' => $filename,
-            ];
         }
 
         if (empty($generated_files)) {
@@ -347,6 +362,100 @@ final class Plec_Plugin {
         return 'data:' . $mime . ';base64,' . base64_encode($content);
     }
 
+    private function extract_ad_networks(array $row): array {
+        $raw_networks = $row['adNetworks'] ?? null;
+        $networks = [];
+
+        if (is_array($raw_networks)) {
+            foreach ($raw_networks as $network) {
+                $network_name = trim((string) $network);
+                if ($network_name !== '') {
+                    $networks[] = $network_name;
+                }
+            }
+        }
+
+        if (empty($networks)) {
+            $fallback = trim((string) ($row['adNetwork'] ?? ''));
+            if ($fallback !== '') {
+                $networks[] = $fallback;
+            }
+        }
+
+        if (empty($networks)) {
+            $networks[] = 'AppLovin';
+        }
+
+        return array_values(array_unique($networks));
+    }
+
+    private function build_network_directory_name(string $ad_network): string {
+        $network_directory = sanitize_title($ad_network);
+        if ($network_directory === '') {
+            return 'network';
+        }
+
+        return $network_directory;
+    }
+
+    private function build_clickthrough_adapter(string $ad_network): string {
+        $normalized_network = $this->normalize_ad_network_identifier($ad_network);
+
+        switch ($normalized_network) {
+            case 'facebook':
+                return <<<'JS'
+if (window.FbPlayableAd && typeof window.FbPlayableAd.onCTAClick === "function") {
+  window.FbPlayableAd.onCTAClick();
+  return;
+}
+JS;
+
+            case 'google':
+                return <<<'JS'
+if (window.ExitApi && typeof window.ExitApi.exit === "function") {
+  window.ExitApi.exit();
+  return;
+}
+if (window.Enabler && typeof window.Enabler.exit === "function") {
+  window.Enabler.exit("CTA");
+  return;
+}
+JS;
+
+            case 'unity':
+            case 'ironsource':
+            case 'mintegral':
+                return <<<'JS'
+if (window.dapi && typeof window.dapi.openStoreUrl === "function") {
+  window.dapi.openStoreUrl();
+  return;
+}
+if (window.dapi && typeof window.dapi.openUrl === "function" && clickTarget) {
+  window.dapi.openUrl(clickTarget);
+  return;
+}
+JS;
+
+            case 'vungle':
+                return <<<'JS'
+if (window.parent && window.parent !== window && typeof window.parent.postMessage === "function") {
+  window.parent.postMessage("download", "*");
+  return;
+}
+JS;
+
+            case 'applovin':
+            case 'moloco':
+            default:
+                return '';
+        }
+    }
+
+    private function normalize_ad_network_identifier(string $ad_network): string {
+        $lowercase = strtolower(trim($ad_network));
+        return (string) preg_replace('/[^a-z0-9]+/', '', $lowercase);
+    }
+
     private function is_allowed_upload(string $tmp_file, string $original_name): bool {
         if ($tmp_file === '' || $original_name === '') {
             return false;
@@ -389,21 +498,6 @@ final class Plec_Plugin {
     }
 
     private function build_job_prefix_from_rows(array $rows): string {
-        $network_prefix = 'network';
-        foreach ($rows as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            $raw_network = trim((string) ($row['adNetwork'] ?? ''));
-            $sanitized_network = sanitize_file_name($raw_network);
-
-            if ($sanitized_network !== '') {
-                $network_prefix = $sanitized_network;
-                break;
-            }
-        }
-
         foreach ($rows as $row) {
             if (!is_array($row)) {
                 continue;
@@ -419,11 +513,11 @@ final class Plec_Plugin {
             $sanitized = sanitize_file_name((string) $name_without_suffix);
 
             if ($sanitized !== '') {
-                return "{$network_prefix}-{$sanitized}";
+                return $sanitized;
             }
         }
 
-        return "{$network_prefix}-sip";
+        return 'sip';
     }
 
     private function can_current_user_use_generator(): bool {

@@ -11,10 +11,6 @@ const createRow = (id) => ({
     portrait: null,
     landscape: null,
   },
-  appStoreUrl: {
-    iOS: null,
-    Android: null,
-  }
 });
 
 const parseNamingFromAssetFilename = (fileName) => {
@@ -162,19 +158,30 @@ export default function App() {
   };
 
   const toggleAdNetwork = (rowId, network) => {
-    if (network !== defaultAdNetwork) {
-      return;
-    }
-
     setRows((current) =>
       current.map((row) => {
         if (row.id !== rowId) {
           return row;
         }
 
+        const currentNetworks = Array.isArray(row.adNetworks)
+          ? row.adNetworks
+          : [defaultAdNetwork];
+        const isSelected = currentNetworks.includes(network);
+        let nextNetworks = currentNetworks;
+
+        if (isSelected) {
+          // Keep at least one network selected per row.
+          if (currentNetworks.length > 1) {
+            nextNetworks = currentNetworks.filter((name) => name !== network);
+          }
+        } else {
+          nextNetworks = [...currentNetworks, network];
+        }
+
         return {
           ...row,
-          adNetworks: [defaultAdNetwork],
+          adNetworks: adNetworkOptions.filter((name) => nextNetworks.includes(name)),
         };
       })
     );
@@ -397,6 +404,10 @@ export default function App() {
       return {
         id: row.id,
         filename: fileName,
+        adNetworks:
+          row.adNetworks && row.adNetworks.length > 0
+            ? row.adNetworks
+            : [defaultAdNetwork],
         adNetwork: row.adNetworks?.[0] || defaultAdNetwork,
         portraitField: `row_${row.id}_portrait`,
         landscapeField: `row_${row.id}_landscape`,
@@ -561,7 +572,6 @@ export default function App() {
                               type="checkbox"
                               className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                               checked={row.adNetworks.includes(option)}
-                              disabled={option !== defaultAdNetwork}
                               onChange={() => toggleAdNetwork(row.id, option)}
                             />
                             <span>{option}</span>

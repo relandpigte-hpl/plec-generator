@@ -70,7 +70,7 @@
       const source = document.getElementById("sip-video-source");
       const container = document.getElementById("video-container");
 
-      // Handles clickthrough for MRAID environments, with browser fallback.
+      // Handles clickthrough via network-specific adapter, then MRAID/browser fallback.
       function handleClickAction() {
         const mraid = window.mraid || {};
         const clickTarget =
@@ -79,6 +79,10 @@
           window.clickthrough ||
           window.clickThrough ||
           "";
+
+        // Injected per ad network at generation time.
+        // __CLICKTHROUGH_ADAPTER__
+
         if (mraid.open && typeof mraid.open === "function") {
           if (clickTarget) {
             mraid.open(clickTarget);
