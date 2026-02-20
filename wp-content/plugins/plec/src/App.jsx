@@ -519,7 +519,7 @@ export default function App() {
         >
           <label className="flex cursor-pointer flex-col gap-1 text-sm text-slate-800">
             <span className="font-medium">Bulk Upload</span>
-            <span className="text-xs text-slate-600 text-wrap wrap-break">
+            <span className="text-xs text-slate-600 text-wrap break-all">
               Upload multiple files. For best results, use this example naming pattern: <code className="text-amber-600">projectName_sip_YYYYMMDD_NN_clientName|conceptName_portrait|landscape.ext</code>.
             </span>
             <span className="text-xs text-slate-600">
