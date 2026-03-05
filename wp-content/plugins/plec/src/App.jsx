@@ -15,20 +15,23 @@ const createRow = (id) => ({
 
 const parseNamingFromAssetFilename = (fileName) => {
   const nameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
-  const coreNameMatch = nameWithoutExtension.match(
-    /^(.*?_sip_\d{8}_\d{2})_.+_(portrait|landscape)$/i
+  const hasSipIteration = /(?:^|_)sip_\d{8}_\d{2}(?:_|$)/i.test(
+    nameWithoutExtension
   );
 
-  if (!coreNameMatch) {
+  if (!hasSipIteration) {
     return null;
   }
 
-  const filenameValue = coreNameMatch[1];
+  const filenameValue = nameWithoutExtension.replace(
+    /_(portrait|landscape)$/i,
+    ""
+  );
   const iterationMatch = filenameValue.match(/(sip_\d{8}_\d{2})/i);
 
   return {
     filename: filenameValue,
-    iterationName: iterationMatch ? iterationMatch[1].toLowerCase() : null,
+    iterationName: iterationMatch ? filenameValue : null,
   };
 };
 
@@ -63,6 +66,18 @@ const areFilesSame = (fileA, fileB) => {
 const hasAnyRowFile = (row) => !!row?.files?.portrait || !!row?.files?.landscape;
 const MAX_FILE_UPLOADS = 20;
 const ALLOWED_UPLOAD_EXTENSIONS = [".mp4", ".gif"];
+const MAX_UPLOAD_FILE_SIZE_BYTES = 1572864;
+const MAX_UPLOAD_FILE_SIZE_LABEL = "1.5 MB";
+
+const getMaxUploadFileSizeBytes = () => {
+  const configuredLimit = Number.parseInt(
+    globalThis?.plecAppConfig?.maxFileSizeBytes,
+    10
+  );
+  return Number.isFinite(configuredLimit) && configuredLimit > 0
+    ? configuredLimit
+    : MAX_UPLOAD_FILE_SIZE_BYTES;
+};
 
 const isAllowedUploadFile = (file) => {
   if (!file?.name) {
@@ -74,6 +89,9 @@ const isAllowedUploadFile = (file) => {
     lowerName.endsWith(extension)
   );
 };
+
+const isAllowedUploadSize = (file) =>
+  !!file && file.size > 0 && file.size <= getMaxUploadFileSizeBytes();
 
 export default function App() {
   const defaultAdNetwork = "AppLovin";
@@ -119,6 +137,11 @@ export default function App() {
       return;
     }
 
+    if (file && !isAllowedUploadSize(file)) {
+      setStatusMessage(`Each file must be ${MAX_UPLOAD_FILE_SIZE_LABEL} or smaller.`);
+      return;
+    }
+
     setRows((current) => {
       const updatedRows = current.map((row) =>
         row.id === rowId
@@ -132,22 +155,28 @@ export default function App() {
               };
 
               if (!file?.name) {
-                return nextRow;
+                return {
+                  ...nextRow,
+                  iterationName: nextRow.filename,
+                };
               }
 
               const parsedNaming = parseNamingFromAssetFilename(file.name);
               if (!parsedNaming) {
-                return nextRow;
+                return {
+                  ...nextRow,
+                  iterationName: nextRow.filename,
+                };
               }
+
+              const nextFilename = nextRow.filename.trim()
+                ? nextRow.filename
+                : parsedNaming.filename;
 
               return {
                 ...nextRow,
-                filename: nextRow.filename.trim()
-                  ? nextRow.filename
-                  : parsedNaming.filename,
-                iterationName: nextRow.iterationName.trim()
-                  ? nextRow.iterationName
-                  : parsedNaming.iterationName || nextRow.iterationName,
+                filename: nextFilename,
+                iterationName: nextFilename,
               };
             })()
           : row
@@ -188,9 +217,23 @@ export default function App() {
   };
 
   const setRowText = (rowId, key, value) => {
-    setRows((current) =>
-      current.map((row) => (row.id === rowId ? { ...row, [key]: value } : row))
-    );
+    setRows((current) => {
+      return current.map((row) => {
+        if (row.id !== rowId) {
+          return row;
+        }
+
+        if (key === "filename" || key === "iterationName") {
+          return {
+            ...row,
+            filename: value,
+            iterationName: value,
+          };
+        }
+
+        return { ...row, [key]: value };
+      });
+    });
   };
 
   const addRow = () => {
@@ -217,10 +260,16 @@ export default function App() {
     const matchedUploads = [];
     let skippedCount = 0;
     let invalidFormatCount = 0;
+    let oversizeCount = 0;
 
     selectedFiles.forEach((file) => {
       if (!isAllowedUploadFile(file)) {
         invalidFormatCount += 1;
+        return;
+      }
+
+      if (!isAllowedUploadSize(file)) {
+        oversizeCount += 1;
         return;
       }
 
@@ -238,7 +287,9 @@ export default function App() {
     if (matchedUploads.length === 0) {
       const reason = invalidFormatCount > 0
         ? "Only MP4 and GIF files are allowed."
-        : "Use names that include _NN_ and end with _portrait or _landscape.";
+        : oversizeCount > 0
+          ? `Each file must be ${MAX_UPLOAD_FILE_SIZE_LABEL} or smaller.`
+          : "Use names that include _NN_ and end with _portrait or _landscape.";
       setStatusMessage(`No files were matched. ${reason}`);
       return;
     }
@@ -257,6 +308,7 @@ export default function App() {
     setRows((current) => {
       const updatedRows = current.map((row) => ({
         ...row,
+        iterationName: row.filename,
         files: { ...row.files },
       }));
 
@@ -292,9 +344,7 @@ export default function App() {
           targetRow.filename = parsedNaming.filename;
         }
 
-        if (!targetRow.iterationName.trim() && parsedNaming.iterationName) {
-          targetRow.iterationName = parsedNaming.iterationName;
-        }
+        targetRow.iterationName = targetRow.filename;
       });
 
       const compactedRows = updatedRows.filter(hasAnyRowFile);
@@ -310,9 +360,13 @@ export default function App() {
       invalidFormatCount > 0
         ? ` ${invalidFormatCount} file(s) were skipped because only MP4 and GIF are allowed.`
         : "";
+    const oversizeSuffix =
+      oversizeCount > 0
+        ? ` ${oversizeCount} file(s) were skipped because each file must be ${MAX_UPLOAD_FILE_SIZE_LABEL} or smaller.`
+        : "";
 
     setStatusMessage(
-      `Assigned ${matchedUploads.length} file(s) to ${assignedSlots.size} slot(s).${messageSuffix}${invalidFormatSuffix}`
+      `Assigned ${matchedUploads.length} file(s) to ${assignedSlots.size} slot(s).${messageSuffix}${invalidFormatSuffix}${oversizeSuffix}`
     );
   };
 
@@ -393,6 +447,17 @@ export default function App() {
     if (hasDuplicateMediaRow) {
       setStatusMessage(
         "Portrait and landscape files cannot be the same in the same row."
+      );
+      return;
+    }
+
+    const oversizedUpload = rowsForGeneration
+      .flatMap((row) => [row.files.portrait, row.files.landscape])
+      .find((file) => file && !isAllowedUploadSize(file));
+
+    if (oversizedUpload) {
+      setStatusMessage(
+        `"${oversizedUpload.name}" exceeds the ${MAX_UPLOAD_FILE_SIZE_LABEL} file size limit.`
       );
       return;
     }
@@ -520,13 +585,16 @@ export default function App() {
           <label className="flex cursor-pointer flex-col gap-1 text-sm text-slate-800">
             <span className="font-medium">Bulk Upload</span>
             <span className="text-xs text-slate-600 text-wrap break-all">
-              Upload multiple files. For best results, use this example naming pattern: <code className="text-amber-600">projectName_sip_YYYYMMDD_NN_clientName|conceptName_portrait|landscape.ext</code>.
+              Upload multiple files. For best results, use this example naming pattern: <code className="text-amber-600">projectName_acslanot_sip_YYYYMMDD_NN_ecomm_product_card_human_portrait|landscape.ext</code>.
             </span>
             <span className="text-xs text-slate-600">
               Drag and drop files here, or click to choose files.
             </span>
             <span className="text-xs text-amber-600">
               Note: Bulk upload is limited to {MAX_FILE_UPLOADS} files per batch due to server constraints. If you have many files, please upload in multiple batches.
+            </span>
+            <span className="text-xs text-amber-600">
+              File size limit: {MAX_UPLOAD_FILE_SIZE_LABEL} maximum per file.
             </span>
             <input
               type="file"

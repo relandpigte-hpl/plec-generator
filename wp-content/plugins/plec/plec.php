@@ -16,6 +16,7 @@ final class Plec_Plugin {
     private const DEV_SERVER_DEFAULT = 'http://localhost:5173';
     private const DEV_SERVER_DEBUG = true;
     private const MAX_FILE_UPLOADS = 20;
+    private const MAX_UPLOAD_FILE_SIZE_BYTES = 1572864; // 1.5 MB
     private const ALLOWED_UPLOAD_MIME_TYPES = [
         'mp4' => 'video/mp4',
         'gif' => 'image/gif',
@@ -125,6 +126,7 @@ final class Plec_Plugin {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('plec_generate_zip'),
             'maxFileUploads' => $max_file_uploads,
+            'maxFileSizeBytes' => self::MAX_UPLOAD_FILE_SIZE_BYTES,
         ]);
     }
 
@@ -235,6 +237,8 @@ final class Plec_Plugin {
             $landscape_field = sanitize_key((string) ($row['landscapeField'] ?? ''));
             $portrait_name = (string) ($_FILES[$portrait_field]['name'] ?? '');
             $landscape_name = (string) ($_FILES[$landscape_field]['name'] ?? '');
+            $portrait_size = (int) ($_FILES[$portrait_field]['size'] ?? 0);
+            $landscape_size = (int) ($_FILES[$landscape_field]['size'] ?? 0);
             $requested_filename = (string) ($row['filename'] ?? '');
             $ad_networks = $this->extract_ad_networks($row);
 
@@ -252,6 +256,14 @@ final class Plec_Plugin {
             if (!is_string($landscape_tmp) || $landscape_tmp === '' || !is_uploaded_file($landscape_tmp)) {
                 wp_send_json_error(['message' => 'Missing landscape file for one or more outputs.'], 400);
             }
+
+            if (!$this->is_allowed_upload_size($portrait_size, $portrait_tmp)) {
+                wp_send_json_error(['message' => 'Portrait file must be 1.5 MB or smaller.'], 400);
+            }
+            if (!$this->is_allowed_upload_size($landscape_size, $landscape_tmp)) {
+                wp_send_json_error(['message' => 'Landscape file must be 1.5 MB or smaller.'], 400);
+            }
+
             if (!$this->is_allowed_upload($portrait_tmp, $portrait_name)) {
                 wp_send_json_error(['message' => 'Portrait file must be MP4 or GIF.'], 400);
             }
@@ -474,6 +486,23 @@ JS;
         }
 
         return self::ALLOWED_UPLOAD_MIME_TYPES[$detected_ext] === $detected_type;
+    }
+
+    private function is_allowed_upload_size(int $reported_size, string $tmp_file): bool {
+        $size = $reported_size;
+
+        if ($size <= 0 && $tmp_file !== '' && is_file($tmp_file)) {
+            $detected_size = filesize($tmp_file);
+            if ($detected_size !== false) {
+                $size = (int) $detected_size;
+            }
+        }
+
+        if ($size <= 0) {
+            return false;
+        }
+
+        return $size <= self::MAX_UPLOAD_FILE_SIZE_BYTES;
     }
 
     private function cleanup_old_zip_archives(string $base_dir): void {
