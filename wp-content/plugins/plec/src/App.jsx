@@ -66,17 +66,17 @@ const areFilesSame = (fileA, fileB) => {
 const hasAnyRowFile = (row) => !!row?.files?.portrait || !!row?.files?.landscape;
 const MAX_FILE_UPLOADS = 20;
 const ALLOWED_UPLOAD_EXTENSIONS = [".mp4", ".gif"];
-const MAX_UPLOAD_FILE_SIZE_BYTES = 1572864;
-const MAX_UPLOAD_FILE_SIZE_LABEL = "1.5 MB";
+const MAX_COMBINED_UPLOAD_FILE_SIZE_BYTES = 3565158;
+const MAX_COMBINED_UPLOAD_FILE_SIZE_LABEL = "3.4 MB";
 
-const getMaxUploadFileSizeBytes = () => {
+const getMaxCombinedUploadFileSizeBytes = () => {
   const configuredLimit = Number.parseInt(
-    globalThis?.plecAppConfig?.maxFileSizeBytes,
+    globalThis?.plecAppConfig?.maxCombinedFileSizeBytes,
     10
   );
   return Number.isFinite(configuredLimit) && configuredLimit > 0
     ? configuredLimit
-    : MAX_UPLOAD_FILE_SIZE_BYTES;
+    : MAX_COMBINED_UPLOAD_FILE_SIZE_BYTES;
 };
 
 const isAllowedUploadFile = (file) => {
@@ -89,9 +89,6 @@ const isAllowedUploadFile = (file) => {
     lowerName.endsWith(extension)
   );
 };
-
-const isAllowedUploadSize = (file) =>
-  !!file && file.size > 0 && file.size <= getMaxUploadFileSizeBytes();
 
 export default function App() {
   const defaultAdNetwork = "AppLovin";
@@ -134,11 +131,6 @@ export default function App() {
   const setRowFile = (rowId, type, file) => {
     if (file && !isAllowedUploadFile(file)) {
       setStatusMessage("Only MP4 and GIF files are allowed.");
-      return;
-    }
-
-    if (file && !isAllowedUploadSize(file)) {
-      setStatusMessage(`Each file must be ${MAX_UPLOAD_FILE_SIZE_LABEL} or smaller.`);
       return;
     }
 
@@ -260,16 +252,10 @@ export default function App() {
     const matchedUploads = [];
     let skippedCount = 0;
     let invalidFormatCount = 0;
-    let oversizeCount = 0;
 
     selectedFiles.forEach((file) => {
       if (!isAllowedUploadFile(file)) {
         invalidFormatCount += 1;
-        return;
-      }
-
-      if (!isAllowedUploadSize(file)) {
-        oversizeCount += 1;
         return;
       }
 
@@ -287,9 +273,7 @@ export default function App() {
     if (matchedUploads.length === 0) {
       const reason = invalidFormatCount > 0
         ? "Only MP4 and GIF files are allowed."
-        : oversizeCount > 0
-          ? `Each file must be ${MAX_UPLOAD_FILE_SIZE_LABEL} or smaller.`
-          : "Use names that include _NN_ and end with _portrait or _landscape.";
+        : "Use names that include _NN_ and end with _portrait or _landscape.";
       setStatusMessage(`No files were matched. ${reason}`);
       return;
     }
@@ -360,13 +344,9 @@ export default function App() {
       invalidFormatCount > 0
         ? ` ${invalidFormatCount} file(s) were skipped because only MP4 and GIF are allowed.`
         : "";
-    const oversizeSuffix =
-      oversizeCount > 0
-        ? ` ${oversizeCount} file(s) were skipped because each file must be ${MAX_UPLOAD_FILE_SIZE_LABEL} or smaller.`
-        : "";
 
     setStatusMessage(
-      `Assigned ${matchedUploads.length} file(s) to ${assignedSlots.size} slot(s).${messageSuffix}${invalidFormatSuffix}${oversizeSuffix}`
+      `Assigned ${matchedUploads.length} file(s) to ${assignedSlots.size} slot(s).${messageSuffix}${invalidFormatSuffix}`
     );
   };
 
@@ -451,13 +431,26 @@ export default function App() {
       return;
     }
 
-    const oversizedUpload = rowsForGeneration
-      .flatMap((row) => [row.files.portrait, row.files.landscape])
-      .find((file) => file && !isAllowedUploadSize(file));
+    const oversizedRow = rowsForGeneration.find((row) => {
+      const portraitFile = row.files.portrait;
+      const landscapeFile = row.files.landscape;
+      if (!portraitFile || !landscapeFile) {
+        return false;
+      }
 
-    if (oversizedUpload) {
+      const combinedSize = portraitFile.size + landscapeFile.size;
+      return (
+        portraitFile.size <= 0 ||
+        landscapeFile.size <= 0 ||
+        combinedSize > getMaxCombinedUploadFileSizeBytes()
+      );
+    });
+
+    if (oversizedRow) {
+      const portraitName = oversizedRow.files.portrait?.name || "portrait file";
+      const landscapeName = oversizedRow.files.landscape?.name || "landscape file";
       setStatusMessage(
-        `"${oversizedUpload.name}" exceeds the ${MAX_UPLOAD_FILE_SIZE_LABEL} file size limit.`
+        `Combined size for "${portraitName}" and "${landscapeName}" exceeds the ${MAX_COMBINED_UPLOAD_FILE_SIZE_LABEL} limit.`
       );
       return;
     }
@@ -594,7 +587,7 @@ export default function App() {
               Note: Bulk upload is limited to {MAX_FILE_UPLOADS} files per batch due to server constraints. If you have many files, please upload in multiple batches.
             </span>
             <span className="text-xs text-amber-600">
-              File size limit: {MAX_UPLOAD_FILE_SIZE_LABEL} maximum per file.
+              Combined file size limit per row: {MAX_COMBINED_UPLOAD_FILE_SIZE_LABEL} for portrait + landscape.
             </span>
             <input
               type="file"

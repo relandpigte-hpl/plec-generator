@@ -16,7 +16,7 @@ final class Plec_Plugin {
     private const DEV_SERVER_DEFAULT = 'http://localhost:5173';
     private const DEV_SERVER_DEBUG = true;
     private const MAX_FILE_UPLOADS = 20;
-    private const MAX_UPLOAD_FILE_SIZE_BYTES = 1572864; // 1.5 MB
+    private const MAX_COMBINED_UPLOAD_FILE_SIZE_BYTES = 3565158; // 3.4 MB
     private const ALLOWED_UPLOAD_MIME_TYPES = [
         'mp4' => 'video/mp4',
         'gif' => 'image/gif',
@@ -126,7 +126,7 @@ final class Plec_Plugin {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('plec_generate_zip'),
             'maxFileUploads' => $max_file_uploads,
-            'maxFileSizeBytes' => self::MAX_UPLOAD_FILE_SIZE_BYTES,
+            'maxCombinedFileSizeBytes' => self::MAX_COMBINED_UPLOAD_FILE_SIZE_BYTES,
         ]);
     }
 
@@ -257,11 +257,15 @@ final class Plec_Plugin {
                 wp_send_json_error(['message' => 'Missing landscape file for one or more outputs.'], 400);
             }
 
-            if (!$this->is_allowed_upload_size($portrait_size, $portrait_tmp)) {
-                wp_send_json_error(['message' => 'Portrait file must be 1.5 MB or smaller.'], 400);
+            $portrait_size_bytes = $this->resolve_upload_size_bytes($portrait_size, $portrait_tmp);
+            $landscape_size_bytes = $this->resolve_upload_size_bytes($landscape_size, $landscape_tmp);
+
+            if ($portrait_size_bytes <= 0 || $landscape_size_bytes <= 0) {
+                wp_send_json_error(['message' => 'Uploaded files must be valid and non-empty.'], 400);
             }
-            if (!$this->is_allowed_upload_size($landscape_size, $landscape_tmp)) {
-                wp_send_json_error(['message' => 'Landscape file must be 1.5 MB or smaller.'], 400);
+
+            if (($portrait_size_bytes + $landscape_size_bytes) > self::MAX_COMBINED_UPLOAD_FILE_SIZE_BYTES) {
+                wp_send_json_error(['message' => 'Combined portrait and landscape size must be 3.4 MB or smaller.'], 400);
             }
 
             if (!$this->is_allowed_upload($portrait_tmp, $portrait_name)) {
@@ -488,7 +492,7 @@ JS;
         return self::ALLOWED_UPLOAD_MIME_TYPES[$detected_ext] === $detected_type;
     }
 
-    private function is_allowed_upload_size(int $reported_size, string $tmp_file): bool {
+    private function resolve_upload_size_bytes(int $reported_size, string $tmp_file): int {
         $size = $reported_size;
 
         if ($size <= 0 && $tmp_file !== '' && is_file($tmp_file)) {
@@ -499,10 +503,10 @@ JS;
         }
 
         if ($size <= 0) {
-            return false;
+            return 0;
         }
 
-        return $size <= self::MAX_UPLOAD_FILE_SIZE_BYTES;
+        return $size;
     }
 
     private function cleanup_old_zip_archives(string $base_dir): void {
