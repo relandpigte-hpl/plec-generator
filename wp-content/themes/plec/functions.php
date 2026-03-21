@@ -41,7 +41,7 @@ tailpress();
 
 function plec_redirect_if_not_logged_in()
 {
-    if (!is_user_logged_in() && !is_admin() && !is_page('login')) {
+    if (!is_user_logged_in() && !is_admin() && !is_page('login') && !get_query_var('plec_preview_page')) {
         wp_redirect(wp_login_url());
         exit;
     }

@@ -47,11 +47,6 @@ final class Plec_Preview_Plugin {
             return;
         }
 
-        if (!$this->can_current_user_use()) {
-            wp_redirect(wp_login_url());
-            exit;
-        }
-
         $this->enqueue_assets();
         add_filter('show_admin_bar', '__return_false');
 

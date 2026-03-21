@@ -36,9 +36,17 @@
   --plec-header-muted: rgba(255, 255, 255, 0.6);
 }
 
+/* ── Page background gradient ── */
+body {
+  background: linear-gradient(135deg, #DDDCDB 0%, #f5f4f3 40%, #EDBF9B 100%) !important;
+  background-attachment: fixed !important;
+  min-height: 100vh;
+}
+
 /* ── Dark mode page overrides ── */
 body.plec-dark {
-  background: var(--plec-bg) !important;
+  background: linear-gradient(135deg, #2b2b2b 0%, #353535 40%, #3C4044 100%) !important;
+  background-attachment: fixed !important;
   color: var(--plec-text) !important;
 }
 .plec-dark article,

@@ -414,7 +414,7 @@ export default function App() {
       {/* Main content */}
       <div
         ref={containerRef}
-        style={{ flex: 1, position: "relative", overflow: "hidden" }}
+        style={{ flex: 1, position: "relative", overflow: "hidden", background: "linear-gradient(135deg, #DDDCDB 0%, #f5f4f3 40%, #EDBF9B 100%)" }}
       >
         {/* Current iteration & filename — top right */}
         {iterations.length > 0 && (
