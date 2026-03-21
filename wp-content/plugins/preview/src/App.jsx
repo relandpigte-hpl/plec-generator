@@ -437,7 +437,7 @@ export default function App() {
             <span>{iterations[activeIteration]?.name || ""}</span>
             <span style={{ color: "rgba(255,255,255,0.4)" }}>|</span>
             <span style={{ color: "rgba(255,255,255,0.6)", fontFamily: "monospace", fontSize: 11 }}>
-              {currentFile}
+              {currentFile.split("/").pop()}
             </span>
           </div>
         )}

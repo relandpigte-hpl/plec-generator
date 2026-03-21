@@ -544,18 +544,20 @@ export default function App() {
         `Generated ${data?.data?.fileCount ?? rowsForGeneration.length} file(s). Download started.`
       );
 
-      // Build preview URL
+      // Build preview URL using server-returned file paths
       const siteUrl = config.siteUrl || window.location.origin;
-      const params = new URLSearchParams();
-      params.set("theme", "calcite");
-      rowsForGeneration.forEach((row, i) => {
-        const num = i + 1;
-        const iterName = row.iterationName?.trim() || row.filename?.trim() || `sip-${num}`;
-        const fileName = row.filename?.trim() || `sip-${num}.html`;
-        params.set(`n${num}`, iterName);
-        params.set(`m${num}`, /\.html?$/i.test(fileName) ? fileName : `${fileName}.html`);
-      });
-      setPreviewUrl(`${siteUrl}/preview?${params.toString()}`);
+      const previewFiles = data?.data?.previewFiles || [];
+      if (previewFiles.length > 0) {
+        const params = new URLSearchParams();
+        params.set("theme", "calcite");
+        previewFiles.forEach((pf, i) => {
+          const num = i + 1;
+          const iterName = rowsForGeneration[i]?.iterationName?.trim() || pf.name || `sip-${num}`;
+          params.set(`n${num}`, iterName);
+          params.set(`m${num}`, pf.path);
+        });
+        setPreviewUrl(`${siteUrl}/preview?${params.toString()}`);
+      }
 
       setRows([createRow(1)]);
       setNextRowId(2);

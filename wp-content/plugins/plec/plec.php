@@ -335,9 +335,32 @@ final class Plec_Plugin {
 
         $zip->close();
 
+        // Build preview file list — relative paths from plec-uploads/
+        $preview_files = [];
+        $seen_rows = [];
+        $preview_used = [];
+        foreach ($rows as $index => $row) {
+            $row_key = (int) $index;
+            if (isset($seen_rows[$row_key])) {
+                continue;
+            }
+            $seen_rows[$row_key] = true;
+
+            $requested_filename = (string) ($row['filename'] ?? '');
+            $ad_networks = $this->extract_ad_networks($row);
+            $first_network = $this->build_network_directory_name($ad_networks[0] ?? 'AppLovin');
+            $filename = $this->build_output_filename($requested_filename, $row_key + 1, $preview_used);
+            $relative_path = $job_id . '/' . ($first_network !== '' ? $first_network . '/' : '') . $filename;
+            $preview_files[] = [
+                'name' => trim((string) ($row['filename'] ?? '')),
+                'path' => $relative_path,
+            ];
+        }
+
         wp_send_json_success([
             'downloadUrl' => trailingslashit($base_url) . "{$job_id}.zip",
             'fileCount' => count($generated_files),
+            'previewFiles' => $preview_files,
         ]);
     }
 

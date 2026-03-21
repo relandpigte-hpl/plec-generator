@@ -32,11 +32,17 @@ final class Plec_Preview_Plugin {
      * Register /preview as a custom rewrite endpoint.
      */
     public function register_rewrite(): void {
-        add_rewrite_rule('^preview/?$', 'index.php?plec_preview_page=1', 'top');
+        add_rewrite_rule('^preview/?', 'index.php?plec_preview_page=1', 'top');
         add_filter('query_vars', function (array $vars): array {
             $vars[] = 'plec_preview_page';
             return $vars;
         });
+
+        // Auto-flush rewrite rules if our rule is missing
+        $rules = get_option('rewrite_rules');
+        if (!is_array($rules) || !isset($rules['^preview/?'])) {
+            flush_rewrite_rules(false);
+        }
     }
 
     /**
