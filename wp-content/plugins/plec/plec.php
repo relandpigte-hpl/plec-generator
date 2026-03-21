@@ -127,6 +127,7 @@ final class Plec_Plugin {
             'nonce' => wp_create_nonce('plec_generate_zip'),
             'maxFileUploads' => $max_file_uploads,
             'maxCombinedFileSizeBytes' => self::MAX_COMBINED_UPLOAD_FILE_SIZE_BYTES,
+            'siteUrl' => home_url(),
         ]);
     }
 
@@ -204,8 +205,8 @@ final class Plec_Plugin {
             wp_send_json_error(['message' => $uploads['error']], 500);
         }
 
-        $base_dir = trailingslashit($uploads['basedir']) . 'plec-generated';
-        $base_url = trailingslashit($uploads['baseurl']) . 'plec-generated';
+        $base_dir = trailingslashit($uploads['basedir']) . 'plec-uploads';
+        $base_url = trailingslashit($uploads['baseurl']) . 'plec-uploads';
 
         if (!wp_mkdir_p($base_dir)) {
             wp_send_json_error(['message' => 'Unable to prepare output directory.'], 500);

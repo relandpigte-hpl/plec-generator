@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+#plec-preview-root {
+  --pv-bg: #f5f4f3;
+  --pv-surface: #ffffff;
+  --pv-surface-alt: #DDDCDB;
+  --pv-border: rgba(60, 64, 68, 0.12);
+  --pv-text: #3C4044;
+  --pv-text-secondary: #5a5d60;
+  --pv-text-muted: #7a7d80;
+  --pv-accent: #FD7B41;
+  --pv-accent-soft: rgba(253, 123, 65, 0.12);
+  --pv-secondary: #EDBF9B;
+  --pv-sidebar-bg: #3C4044;
+  --pv-sidebar-text: #ffffff;
+  --pv-sidebar-muted: rgba(255, 255, 255, 0.55);
+  --pv-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --pv-sidebar-active: rgba(253, 123, 65, 0.2);
+}
+
+.plec-dark #plec-preview-root {
+  --pv-bg: #2b2b2b;
+  --pv-surface: #353535;
+  --pv-surface-alt: #3C4044;
+  --pv-border: rgba(255, 255, 255, 0.08);
+  --pv-text: #DDDCDB;
+  --pv-text-secondary: #bfbfbf;
+  --pv-text-muted: #9f9f9f;
+  --pv-sidebar-bg: #2b2b2b;
+}
+
+#plec-preview-root {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+}
+
+/* Sidebar transition */
+.pv-sidebar {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sidebar toggle button */
+.pv-sidebar-toggle {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  z-index: 100;
+  width: 28px;
+  height: 56px;
+  border-radius: 0 10px 10px 0;
+  background: var(--pv-sidebar-bg);
+  color: var(--pv-sidebar-muted);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+}
+.pv-sidebar-toggle:hover {
+  color: var(--pv-accent);
+  width: 32px;
+}
+
+/* QR code container */
+.pv-qr {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.pv-qr canvas {
+  border-radius: 6px;
+}
+
+/* Menu items (top-level) */
+.pv-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--pv-sidebar-muted);
+  font-size: 19px;
+  font-weight: 600;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.pv-menu-item.is-active {
+  color: var(--pv-accent);
+}
+
+.pv-menu-icon {
+  width: 43px;
+  height: 43px;
+  border-radius: 8px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Sub-menu items (indented under parent) */
+.pv-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 60px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--pv-sidebar-muted);
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.pv-sub-item:hover {
+  background: var(--pv-sidebar-hover);
+  color: var(--pv-sidebar-text);
+}
+.pv-sub-item.is-active {
+  color: var(--pv-accent);
+  background: var(--pv-sidebar-active);
+}
+
+.pv-sub-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Click banner overlay */
+@keyframes pv-banner-in {
+  from { opacity: 0; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.pv-click-banner {
+  animation: pv-banner-in 0.15s ease-out both;
+  pointer-events: none;
+  overflow: hidden;
+}
+

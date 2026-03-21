@@ -108,6 +108,18 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [isBulkDragging, setIsBulkDragging] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  const networkColors = {
+    AppLovin: { color: "var(--plec-pill-applovin)", bg: "var(--plec-pill-applovin-bg)", border: "var(--plec-pill-applovin-border)" },
+    Facebook: { color: "var(--plec-pill-facebook)", bg: "var(--plec-pill-facebook-bg)", border: "var(--plec-pill-facebook-border)" },
+    Google: { color: "var(--plec-pill-google)", bg: "var(--plec-pill-google-bg)", border: "var(--plec-pill-google-border)" },
+    Unity: { color: "var(--plec-pill-unity)", bg: "var(--plec-pill-unity-bg)", border: "var(--plec-pill-unity-border)" },
+    Vungle: { color: "var(--plec-pill-vungle)", bg: "var(--plec-pill-vungle-bg)", border: "var(--plec-pill-vungle-border)" },
+    Mintegral: { color: "var(--plec-pill-mintegral)", bg: "var(--plec-pill-mintegral-bg)", border: "var(--plec-pill-mintegral-border)" },
+    IronSource: { color: "var(--plec-pill-ironsource)", bg: "var(--plec-pill-ironsource-bg)", border: "var(--plec-pill-ironsource-border)" },
+    Moloco: { color: "var(--plec-pill-moloco)", bg: "var(--plec-pill-moloco-bg)", border: "var(--plec-pill-moloco-border)" },
+  };
 
   const withAutoAppendedRow = (updatedRows) => {
     const lastRow = updatedRows[updatedRows.length - 1];
@@ -531,177 +543,266 @@ export default function App() {
       setStatusMessage(
         `Generated ${data?.data?.fileCount ?? rowsForGeneration.length} file(s). Download started.`
       );
+
+      // Build preview URL
+      const siteUrl = config.siteUrl || window.location.origin;
+      const params = new URLSearchParams();
+      params.set("theme", "calcite");
+      rowsForGeneration.forEach((row, i) => {
+        const num = i + 1;
+        const iterName = row.iterationName?.trim() || row.filename?.trim() || `sip-${num}`;
+        const fileName = row.filename?.trim() || `sip-${num}.html`;
+        params.set(`n${num}`, iterName);
+        params.set(`m${num}`, /\.html?$/i.test(fileName) ? fileName : `${fileName}.html`);
+      });
+      setPreviewUrl(`${siteUrl}/preview?${params.toString()}`);
+
       setRows([createRow(1)]);
       setNextRowId(2);
     } catch (error) {
       setStatusMessage(error?.message || "Generation failed.");
+      setPreviewUrl("");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  return (
-    <>
-      {isGenerating ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-md px-4">
-          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/55 bg-gradient-to-br from-white via-slate-50 to-blue-100 p-7 text-center shadow-2xl">
-            <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-blue-300/35 blur-2xl" />
-            <div className="pointer-events-none absolute -bottom-10 -right-8 h-28 w-28 rounded-full bg-cyan-300/40 blur-2xl" />
-            <div className="relative mx-auto mb-4 h-16 w-16">
-              <div className="absolute inset-0 animate-ping rounded-full bg-blue-200/70" />
-              <div className="absolute inset-1 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
-              <div className="absolute inset-4 rounded-full bg-white shadow-inner" />
-            </div>
-            <p className="text-lg font-semibold tracking-tight text-slate-900">
-              Please wait while processing and don&apos;t refresh the page
-            </p>
-            <div className="mt-3 flex items-center justify-center gap-1.5">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-500" />
-            </div>
-          </div>
-        </div>
-      ) : null}
-      <div className="mx-auto my-6 font-sans flex flex-col gap-5">
-        <Instructions />
-        <div
-          className={`rounded border border-dashed p-3 transition-colors ${
-            isBulkDragging
-              ? "border-blue-500 bg-blue-50"
-              : "border-slate-300 bg-slate-50"
-          }`}
-          onDragOver={handleBulkDragOver}
-          onDragLeave={handleBulkDragLeave}
-          onDrop={handleBulkDrop}
-        >
-          <label className="flex cursor-pointer flex-col gap-1 text-sm text-slate-800">
-            <span className="font-medium">Bulk Upload</span>
-            <span className="text-xs text-slate-600 text-wrap break-all">
-              Upload multiple files. For best results, use this example naming pattern: <code className="text-amber-600">projectName_acslanot_sip_YYYYMMDD_NN_ecomm_product_card_human_portrait|landscape.ext</code>.
-            </span>
-            <span className="text-xs text-slate-600">
-              Drag and drop files here, or click to choose files.
-            </span>
-            <span className="text-xs text-amber-600">
-              Note: Bulk upload is limited to {MAX_FILE_UPLOADS} files per batch due to server constraints. If you have many files, please upload in multiple batches.
-            </span>
-            <span className="text-xs text-amber-600">
-              Combined file size limit per row: {MAX_COMBINED_UPLOAD_FILE_SIZE_LABEL} for portrait + landscape.
-            </span>
-            <input
-              type="file"
-              multiple
-              accept=".mp4,.gif,video/mp4,image/gif"
-              onChange={handleBulkUploadInputChange}
-              className="hidden"
-            />
-          </label>
-        </div>
-        <div className="overflow-x-auto rounded border border-slate-200 bg-white">
-          <table className="w-full min-w-245 border-collapse">
-            <thead>
-              <tr>
-                <th className="plec-th">Ad Network</th>
-                <th className="plec-th">Portrait File</th>
-                <th className="plec-th">Landscape File</th>
-                <th className="plec-th">Filename</th>
-                <th className="plec-th">Iteration Name</th>
-                <th className="plec-th">&nbsp;</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const rowKey = `row-${row.id}`;
-                const hasDuplicateMedia = areFilesSame(
-                  row.files.portrait,
-                  row.files.landscape
-                );
+  const filledRowCount = rows.filter(
+    (row) => !!row.files.portrait || !!row.files.landscape
+  ).length;
 
-                return (
-                  <tr
-                    key={rowKey}
-                    className={`${
-                      hasDuplicateMedia ? "bg-red-50" : ""
-                    } hover:bg-slate-50`}
-                  >
-                    <td className="plec-td">
-                      <div className="grid grid-cols-none gap-x-3 gap-y-1.5">
-                        {adNetworkOptions.map((option) => (
-                          <label key={`${rowKey}-${option}`} className="flex items-center gap-1 text-xs text-slate-800">
-                            <input
-                              type="checkbox"
-                              className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                              checked={row.adNetworks.includes(option)}
-                              onChange={() => toggleAdNetwork(row.id, option)}
-                            />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="plec-td">
-                      <FileDropZone
-                        inputId={`portrait-${rowKey}`}
-                        label="Drop portrait file"
-                        value={row.files.portrait || null}
-                        onChange={(file) => setRowFile(row.id, "portrait", file)}
-                      />
-                    </td>
-                    <td className="plec-td">
-                      <FileDropZone
-                        inputId={`landscape-${rowKey}`}
-                        label="Drop landscape file"
-                        value={row.files.landscape || null}
-                        onChange={(file) => setRowFile(row.id, "landscape", file)}
-                      />
-                    </td>
-                    <td className="plec-td w-1/4">
-                      <input
-                        type="text"
-                        className="plec-input"
-                        value={row.filename}
-                        onChange={(event) => setRowText(row.id, "filename", event.target.value)}
-                      />
-                    </td>
-                    <td className="plec-td w-1/4">
-                      <input
-                        type="text"
-                        className="plec-input"
-                        value={row.iterationName}
-                        onChange={(event) => setRowText(row.id, "iterationName", event.target.value)}
-                      />
-                    </td>
-                    <td className="plec-td">
-                      <button className="button" type="button" onClick={() => removeRow(row.id)} disabled={rows.length === 1}>
-                        x
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <div className="footer flex gap-5 md:flex-row flex-col">
-          <button className="button min-w-50" type="button" onClick={addRow}>
-            Add another SIP
-          </button>
-          <button
-            className="button bg-blue-500! hover:bg-blue-700! text-white! min-w-50 disabled:cursor-not-allowed disabled:opacity-60"
-            type="button"
-            onClick={handleGenerate}
-            disabled={isGenerating}
-          >
-            {isGenerating ? "Generating..." : "Generate"}
-          </button>
-        </div>
-        {statusMessage ? (
-          <div className="notice">
-            <p className="text-sm text-slate-700">{statusMessage}</p>
+  const getStatusStyle = () => {
+    const s = statusMessage.toLowerCase();
+    if (s.includes("fail") || s.includes("error") || s.includes("cannot") || s.includes("exceed") || s.includes("no files"))
+      return { background: "var(--plec-red-soft)", color: "var(--plec-red-text)", border: "1px solid var(--plec-red-soft)" };
+    if (s.includes("generated") || s.includes("assigned"))
+      return { background: "var(--plec-green-soft)", color: "var(--plec-green-text)", border: "1px solid var(--plec-green-soft)" };
+    return { background: "var(--plec-amber-soft)", color: "var(--plec-amber-text)", border: "1px solid var(--plec-amber-border)" };
+  };
+
+  const S = {
+    label: { display: "block", marginBottom: 6, fontSize: 11, fontWeight: 600, color: "var(--plec-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" },
+    grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 },
+  };
+
+  return (
+    <div style={{
+      position: "relative",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif",
+    }}>
+      {/* Generating overlay */}
+      {isGenerating && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--plec-overlay)", backdropFilter: "blur(12px)", padding: 16 }}>
+          <div style={{ width: "100%", maxWidth: 340, borderRadius: 28, background: "var(--plec-surface)", border: "1px solid var(--plec-border)", padding: "36px 32px", textAlign: "center", boxShadow: "var(--plec-shadow-lg)" }}>
+            <div style={{ position: "relative", margin: "0 auto 20px", width: 56, height: 56 }}>
+              <div className="animate-ping" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "var(--plec-accent-soft)" }} />
+              <div className="animate-spin" style={{ position: "absolute", inset: 4, borderRadius: "50%", border: "2.5px solid var(--plec-border)", borderTopColor: "var(--plec-accent)" }} />
+              <div style={{ position: "absolute", inset: 14, borderRadius: "50%", background: "var(--plec-surface)" }} />
+            </div>
+            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--plec-text)", margin: 0 }}>Generating SIP files...</p>
+            <p style={{ fontSize: 13, color: "var(--plec-text-muted)", margin: "6px 0 0" }}>Please don&apos;t refresh the page</p>
           </div>
-        ) : null}
+        </div>
+      )}
+
+      {/* Content */}
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 1120, margin: "0 auto", padding: "28px 20px 48px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Instructions */}
+          <Instructions />
+
+          {/* Bulk Upload */}
+          <div
+            className="plec-card"
+            style={{ overflow: "hidden", transition: "all 0.25s", boxShadow: isBulkDragging ? `0 0 0 2px var(--plec-accent), var(--plec-shadow)` : undefined }}
+            onDragOver={handleBulkDragOver}
+            onDragLeave={handleBulkDragLeave}
+            onDrop={handleBulkDrop}
+          >
+            <label style={{ display: "flex", cursor: "pointer", alignItems: "center", gap: 14, padding: "16px 20px" }}>
+              <div style={{
+                width: 40, height: 40, flexShrink: 0, borderRadius: 12,
+                background: isBulkDragging ? "var(--plec-accent-soft)" : "var(--plec-surface-alt)",
+                color: isBulkDragging ? "var(--plec-accent)" : "var(--plec-text-muted)",
+                display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
+              }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--plec-text)" }}>Bulk Upload</span>
+                <span style={{ fontSize: 12, color: "var(--plec-text-muted)", marginLeft: 6 }}>
+                  Drop files or click &middot; Max {MAX_FILE_UPLOADS}/batch &middot; {MAX_COMBINED_UPLOAD_FILE_SIZE_LABEL}/row
+                </span>
+              </div>
+              <input type="file" multiple accept=".mp4,.gif,video/mp4,image/gif" onChange={handleBulkUploadInputChange} style={{ display: "none" }} />
+            </label>
+          </div>
+
+          {/* SIP Rows */}
+          {rows.map((row, index) => {
+            const rowKey = `row-${row.id}`;
+            const hasDup = areFilesSame(row.files.portrait, row.files.landscape);
+            const complete = !!row.files.portrait && !!row.files.landscape;
+
+            return (
+              <div
+                key={rowKey}
+                className="plec-card animate-fade-in-up"
+                style={{ overflow: "hidden", animationDelay: `${index * 60}ms`, boxShadow: hasDup ? `inset 0 0 0 1.5px var(--plec-red), var(--plec-shadow)` : undefined }}
+              >
+                {/* Row header */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid var(--plec-border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 11, fontWeight: 700,
+                      background: complete ? "var(--plec-green-soft)" : "var(--plec-surface-alt)",
+                      color: complete ? "var(--plec-green)" : "var(--plec-text-muted)",
+                      transition: "all 0.3s",
+                    }}>
+                      {complete ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      ) : index + 1}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--plec-text)" }}>Row {index + 1}</span>
+                    {hasDup && <span className="plec-badge" style={{ background: "var(--plec-red-soft)", color: "var(--plec-red-text)", fontSize: 10 }}>Duplicate</span>}
+                  </div>
+                  <button
+                    type="button" onClick={() => removeRow(row.id)} disabled={rows.length === 1}
+                    style={{ width: 26, height: 26, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: "var(--plec-text-muted)", cursor: "pointer", opacity: rows.length === 1 ? 0.25 : 1, transition: "all 0.15s" }}
+                    onMouseEnter={(e) => { if (rows.length > 1) { e.currentTarget.style.background = "var(--plec-red-soft)"; e.currentTarget.style.color = "var(--plec-red)"; } }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--plec-text-muted)"; }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+
+                {/* Row body */}
+                <div style={{ padding: "18px 20px 20px" }}>
+                  <div style={S.grid2}>
+                    <div>
+                      <div style={S.label}>Portrait</div>
+                      <FileDropZone inputId={`portrait-${rowKey}`} label="Drop portrait file" value={row.files.portrait || null} onChange={(f) => setRowFile(row.id, "portrait", f)} />
+                    </div>
+                    <div>
+                      <div style={S.label}>Landscape</div>
+                      <FileDropZone inputId={`landscape-${rowKey}`} label="Drop landscape file" value={row.files.landscape || null} onChange={(f) => setRowFile(row.id, "landscape", f)} />
+                    </div>
+                  </div>
+
+                  <div style={{ ...S.grid2, marginTop: 14 }}>
+                    <div>
+                      <div style={S.label}>Filename</div>
+                      <input type="text" className="plec-input" placeholder="Auto-generated" value={row.filename} onChange={(e) => setRowText(row.id, "filename", e.target.value)} />
+                    </div>
+                    <div>
+                      <div style={S.label}>Iteration</div>
+                      <input type="text" className="plec-input" placeholder="Auto-generated" value={row.iterationName} onChange={(e) => setRowText(row.id, "iterationName", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 14 }}>
+                    <div style={S.label}>Networks</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {adNetworkOptions.map((opt) => {
+                        const on = row.adNetworks.includes(opt);
+                        const c = networkColors[opt] || networkColors.AppLovin;
+                        return (
+                          <button key={`${rowKey}-${opt}`} type="button" onClick={() => toggleAdNetwork(row.id, opt)}
+                            style={{
+                              padding: "5px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                              border: on ? `1.5px solid ${c.border}` : "1.5px solid var(--plec-border)",
+                              background: on ? c.bg : "transparent",
+                              color: on ? c.color : "var(--plec-text-muted)",
+                              transform: on ? "scale(1.02)" : "scale(1)",
+                            }}
+                          >{opt}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Actions */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, paddingTop: 4 }}>
+            <button type="button" onClick={addRow}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 20px", borderRadius: 14,
+                border: "1px solid var(--plec-border)", background: "var(--plec-surface)", color: "var(--plec-text-secondary)",
+                fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s", boxShadow: "var(--plec-shadow)",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--plec-accent)"; e.currentTarget.style.color = "var(--plec-accent-text)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--plec-border)"; e.currentTarget.style.color = "var(--plec-text-secondary)"; }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              Add Row
+            </button>
+            <button type="button" onClick={handleGenerate} disabled={isGenerating}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 28px", borderRadius: 14,
+                border: "none", background: "var(--plec-header-bg)", backgroundSize: "200% 200%",
+                color: "#fff", fontSize: 13, fontWeight: 600,
+                cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.5 : 1,
+                transition: "all 0.25s", boxShadow: "0 4px 16px var(--plec-accent-glow)",
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+              {isGenerating ? "Generating..." : `Generate${filledRowCount > 0 ? ` (${filledRowCount})` : ""}`}
+            </button>
+          </div>
+
+          {/* Status */}
+          {statusMessage && (
+            <div className="animate-fade-in-up" style={{ borderRadius: 14, padding: "12px 16px", fontSize: 13, fontWeight: 500, ...getStatusStyle() }}>
+              <p style={{ margin: 0 }}>{statusMessage}</p>
+            </div>
+          )}
+
+          {/* Preview URL */}
+          {previewUrl && (
+            <div className="plec-card animate-fade-in-up" style={{ overflow: "hidden" }}>
+              <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--plec-border)", display: "flex", alignItems: "center", gap: 8 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--plec-accent)" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--plec-text)" }}>Preview URL</span>
+                <button
+                  type="button"
+                  onClick={() => { navigator.clipboard.writeText(previewUrl); }}
+                  style={{
+                    marginLeft: "auto", padding: "4px 10px", borderRadius: 6,
+                    border: "1px solid var(--plec-border)", background: "var(--plec-surface-alt)",
+                    fontSize: 11, fontWeight: 600, color: "var(--plec-text-muted)", cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--plec-accent)"; e.currentTarget.style.color = "var(--plec-accent)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--plec-border)"; e.currentTarget.style.color = "var(--plec-text-muted)"; }}
+                >
+                  Copy
+                </button>
+              </div>
+              <div style={{ padding: "10px 16px" }}>
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "block", fontSize: 12, fontFamily: "monospace",
+                    color: "var(--plec-accent)", wordBreak: "break-all", lineHeight: 1.5,
+                    textDecoration: "none",
+                  }}
+                >
+                  {previewUrl}
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </>
+    </div>
   );
 }

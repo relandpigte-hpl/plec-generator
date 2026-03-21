@@ -20,55 +20,43 @@
 <div id="page" class="min-h-screen flex flex-col">
     <?php do_action('tailpress_header'); ?>
 
-    <header class="container mx-auto py-6">
-        <div class="mx-auto md:flex md:justify-between md:items-center">
-            <div class="flex justify-between items-center">
-                <div>
-                    <?php if (has_custom_logo()): ?>
-                        <?php the_custom_logo(); ?>
-                    <?php else: ?>
-                        <div class="flex items-center gap-2">
-                            <a href="<?php echo esc_url(home_url('/')); ?>" class="!no-underline font-medium text-lg">
-                                <?php bloginfo('name'); ?>
-                            </a>
-                            <?php if ($description = get_bloginfo('description')): ?>
-                                <span class="text-sm font-light text-dark/80">|</span>
-                                <span class="text-sm font-light text-dark/80"><?php echo esc_html($description); ?></span>
-                            <?php endif; ?>
-                        </div>
+    <header class="site-header">
+        <div class="site-header__inner">
+            <div class="site-header__brand">
+                <?php if (has_custom_logo()): ?>
+                    <?php the_custom_logo(); ?>
+                <?php else: ?>
+                    <a href="<?php echo esc_url(home_url('/')); ?>" class="site-header__title">
+                        <?php bloginfo('name'); ?>
+                    </a>
+                    <?php if ($description = get_bloginfo('description')): ?>
+                        <span class="site-header__sep">|</span>
+                        <span class="site-header__desc"><?php echo esc_html($description); ?></span>
                     <?php endif; ?>
-                </div>
-
-                <?php if (has_nav_menu('primary')): ?>
-                    <div class="md:hidden">
-                        <button type="button" aria-label="Toggle navigation" id="primary-menu-toggle">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                            </svg>
-                        </button>
-                    </div>
                 <?php endif; ?>
             </div>
 
-            <div id="primary-navigation" class="hidden md:flex md:bg-transparent gap-6 items-center border border-light md:border-none rounded-xl p-4 md:p-0">
-                <nav>
-                    <?php if (current_user_can('administrator') && !has_nav_menu('primary')): ?>
-                        <a href="<?php echo esc_url(admin_url('nav-menus.php')); ?>" class="text-sm text-zinc-600"><?php esc_html_e('Edit Menus', 'tailpress'); ?></a>
-                    <?php else: ?>
-                        <?php
-                        wp_nav_menu([
-                            'container_id'    => 'primary-menu',
-                            'container_class' => '',
-                            'menu_class'      => 'md:flex md:-mx-4 [&_a]:!no-underline',
-                            'theme_location'  => 'primary',
-                            'li_class'        => 'md:mx-4',
-                            'fallback_cb'     => false,
-                        ]);
-                        ?>
-                    <?php endif; ?>
-                </nav>
+            <button type="button" aria-label="Toggle navigation" id="primary-menu-toggle" class="site-header__toggle">
+                <svg class="hamburger-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="24" height="24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                </svg>
+                <svg class="close-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="24" height="24" style="display:none">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
 
-            </div>
+            <nav id="primary-navigation" class="site-header__nav">
+                <?php
+                wp_nav_menu([
+                    'container_id'    => 'primary-menu',
+                    'container_class' => '',
+                    'menu_class'      => 'site-header__menu',
+                    'theme_location'  => 'primary',
+                    'li_class'        => 'site-header__menu-item',
+                    'fallback_cb'     => 'wp_page_menu',
+                ]);
+                ?>
+            </nav>
         </div>
     </header>
 

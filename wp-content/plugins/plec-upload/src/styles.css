@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/* ── Calcite palette mapped to upload plugin ── */
+#plec-upload-root {
+  --pu-bg: var(--plec-bg, #f5f4f3);
+  --pu-surface: var(--plec-surface, #ffffff);
+  --pu-surface-alt: var(--plec-surface-alt, #DDDCDB);
+  --pu-border: var(--plec-border, rgba(60,64,68,0.12));
+  --pu-border-subtle: var(--plec-border-subtle, rgba(60,64,68,0.06));
+  --pu-text: var(--plec-text, #3C4044);
+  --pu-text-secondary: var(--plec-text-secondary, #5a5d60);
+  --pu-text-muted: var(--plec-text-muted, #7a7d80);
+  --pu-input-bg: #f5f4f3;
+  --pu-input-border: rgba(60,64,68,0.12);
+  --pu-input-focus: #FD7B41;
+  --pu-accent: #FD7B41;
+  --pu-accent-soft: rgba(253,123,65,0.1);
+  --pu-accent-text: #FD7B41;
+  --pu-accent-glow: rgba(253,123,65,0.2);
+  --pu-secondary: #EDBF9B;
+  --pu-green: #2d9f6f;
+  --pu-green-soft: rgba(45,159,111,0.1);
+  --pu-green-text: #237a56;
+  --pu-red: #d94032;
+  --pu-red-soft: rgba(217,64,50,0.08);
+  --pu-red-text: #b5332a;
+  --pu-amber-soft: rgba(237,191,155,0.2);
+  --pu-amber-text: #c97a2e;
+  --pu-shadow: 0 1px 3px rgba(60,64,68,0.06), 0 2px 8px rgba(60,64,68,0.04);
+  --pu-shadow-lg: 0 4px 20px rgba(60,64,68,0.1), 0 1px 4px rgba(60,64,68,0.06);
+  --pu-header-bg: #3C4044;
+  --pu-overlay: rgba(60,64,68,0.5);
+}
+
+/* ── Dark mode overrides ── */
+.plec-dark #plec-upload-root {
+  --pu-bg: #2b2b2b;
+  --pu-surface: #353535;
+  --pu-surface-alt: #3C4044;
+  --pu-border: rgba(255,255,255,0.08);
+  --pu-border-subtle: rgba(255,255,255,0.04);
+  --pu-text: #DDDCDB;
+  --pu-text-secondary: #bfbfbf;
+  --pu-text-muted: #9f9f9f;
+  --pu-input-bg: #3C4044;
+  --pu-input-border: rgba(255,255,255,0.1);
+  --pu-input-focus: #FD7B41;
+  --pu-accent-soft: rgba(253,123,65,0.15);
+  --pu-accent-glow: rgba(253,123,65,0.25);
+  --pu-green-soft: rgba(45,159,111,0.15);
+  --pu-red-soft: rgba(217,64,50,0.12);
+  --pu-amber-soft: rgba(237,191,155,0.15);
+  --pu-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  --pu-shadow-lg: 0 4px 20px rgba(0,0,0,0.3);
+  --pu-header-bg: #2b2b2b;
+  --pu-overlay: rgba(0,0,0,0.6);
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.pu-animate { animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+.pu-card {
+  background: var(--pu-surface);
+  border: 1px solid var(--pu-border);
+  border-radius: 16px;
+  box-shadow: var(--pu-shadow);
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+.pu-card:hover { box-shadow: var(--pu-shadow-lg); }
+
+.pu-input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--pu-input-border);
+  background: var(--pu-input-bg);
+  color: var(--pu-text);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  outline: none;
+}
+.pu-input::placeholder { color: var(--pu-text-muted); font-weight: 400; }
+.pu-input:focus {
+  border-color: var(--pu-input-focus);
+  box-shadow: 0 0 0 3px var(--pu-accent-glow);
+  background: var(--pu-surface);
+}
+.pu-input.pu-input--error {
+  border-color: var(--pu-red);
+  box-shadow: 0 0 0 3px var(--pu-red-soft);
+}
+
+.pu-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
